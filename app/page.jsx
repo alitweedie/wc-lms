@@ -179,9 +179,15 @@ function gameEntrants(game, players) {
 }
 
 // ─── Pot ─────────────────────────────────────────────────────────────────────
+// Count players who have actually picked in round 0 (entered), not all players.
+// Before round 0 closes, count current picks. After it closes, count confirmed entrants.
 function calcPot(game, players) {
-  const entrants = gameEntrants(game, players);
-  return entrants.length * ENTRY_FEE + (game.rollover || 0);
+  const r0 = game.rounds[0];
+  const pickedCount = r0 ? Object.values(r0.picks).filter(p => !!p).length : 0;
+  const entrantCount = roundResolved(r0)
+    ? gameEntrants(game, players).length  // locked in after round closes
+    : pickedCount;                         // live count of picks so far
+  return entrantCount * ENTRY_FEE + (game.rollover || 0);
 }
 
 // ─── Who was eliminated and in which round ────────────────────────────────────
