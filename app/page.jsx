@@ -295,11 +295,14 @@ function computeMoneyTracker(state) {
   for (const p of state.players) tracker[p] = { spent:0, won:0, games:[] };
 
   for (const game of state.games) {
-    const entrants = gameEntrants(game, state.players);
+    const r0 = game.rounds[0];
     const pot = calcPot(game, state.players);
 
     for (const p of state.players) {
-      const entered = entrants.includes(p);
+      // A player only pays in if they actually made a pick in round 0.
+      // Before round 0 closes, only count if they have a pick already set.
+      const hasPick = r0 && !!r0.picks[p];
+      const entered = hasPick;
       const isWinner = game.complete && game.winners.includes(p);
       const winnings = isWinner ? Math.floor(pot / game.winners.length) : 0;
       const cost = entered ? ENTRY_FEE : 0;
