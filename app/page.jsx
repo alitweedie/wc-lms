@@ -497,10 +497,12 @@ function computeMoneyTracker(state) {
 
   for (const p of state.players) {
     const entered = predEntrants.includes(p);
+    const predWinAmt = predWinners.includes(p) ? predPrizeEach : 0;
     tracker[p].spent += entered ? PREDICTOR_FEE : 0;
-    tracker[p].won += predWinners.includes(p) ? predPrizeEach : 0;
+    tracker[p].won += predWinAmt;
     tracker[p].predictorScore = scores[p];
     tracker[p].predictorEntered = entered;
+    tracker[p].predictorWinnings = predWinAmt;
     tracker[p].net = tracker[p].won - tracker[p].spent;
   }
   return tracker;
@@ -1142,13 +1144,17 @@ function MoneyTab({ state }) {
             <div style={{flex:1}}>
               <div style={S.moneyName}>{player}</div>
               <div style={S.moneyBreakdown}>
-                Paid: £{t.spent} · Won: £{t.won}
-                {" · "}
-                {t.games.map(g=>(
-                  <span key={g.gameId} style={{marginRight:6,fontSize:9,color:"#6b7280"}}>
-                    {g.gameLabel}: {g.entered?(g.winnings>0?`-£${g.cost}+£${g.winnings}`:`-£${g.cost}`):"sat out"}
+                {t.games.filter(g=>g.entered).map(g=>(
+                  <span key={g.gameId} style={{marginRight:8,fontSize:10,color:"#555"}}>
+                    {g.gameLabel}: {g.winnings>0?`-£${g.cost} +£${g.winnings}`:`-£${g.cost}`}
                   </span>
                 ))}
+                {t.predictorEntered&&(
+                  <span style={{fontSize:10,color:"#555"}}>Predictor: -£{PREDICTOR_FEE}{t.predictorWinnings>0?` +£${t.predictorWinnings}`:""}</span>
+                )}
+                {!t.games.some(g=>g.entered)&&!t.predictorEntered&&(
+                  <span style={{fontSize:10,color:"#333"}}>no entries yet</span>
+                )}
               </div>
             </div>
             <div style={{...S.moneyNet,...(isUp?{color:"#a8e031"}:isEven?{color:"#9ca3af"}:{color:"#e53935"})}}>
@@ -1161,14 +1167,16 @@ function MoneyTab({ state }) {
       {/* Running totals per game */}
       <h2 style={{...S.sectionTitle,marginTop:20}}>BY GAME</h2>
       {state.games.map(game=>{
-        const entrants = gameEntrants(game, state.players);
+        // Use actual picks in round 0 — not gameEntrants which returns all before round closes
+        const r0 = game.rounds[0];
+        const actualEntrants = state.players.filter(p => r0 && !!r0.picks[p]);
         const pot = calcPot(game, state.players);
         return (
           <div key={game.id} style={S.moneyGameBlock}>
             <div style={S.moneyGameHeader}>
               <span style={{fontWeight:700,color:"#fff",fontSize:13}}>{game.label}</span>
               <span style={{fontSize:11,color:"#888"}}>
-                {entrants.length} entered · Pot: <strong style={{color:"#a8e031"}}>£{pot}</strong>
+                {actualEntrants.length} entered · Pot: <strong style={{color:"#a8e031"}}>£{pot}</strong>
                 {game.rollover>0&&<span style={{color:"#a8e031"}}> (incl. £{game.rollover} rollover)</span>}
               </span>
               <span style={{fontSize:11,color:game.complete?(game.winners.length>0?"#4caf50":"#f59e0b"):"#6b7280"}}>
@@ -1177,7 +1185,7 @@ function MoneyTab({ state }) {
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:4,padding:"8px 12px"}}>
               {state.players.map(p=>{
-                const entered = entrants.includes(p);
+                const entered = actualEntrants.includes(p);
                 const won = game.complete && game.winners.includes(p);
                 return (
                   <span key={p} style={{
