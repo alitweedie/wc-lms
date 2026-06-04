@@ -469,8 +469,9 @@ function computeMoneyTracker(state) {
         if (overrideVal === false) continue;
       }
       const ans = pred.answers[q.id];
-      if (ans && picks[q.id] && ans.toLowerCase().trim() === picks[q.id].toLowerCase().trim()) {
-        scores[p] += q.pts;
+      if (ans && picks[q.id]) {
+        const normalise = v => v.includes("-") ? v.split("-").map(Number).sort((a,b)=>a-b).join("-") : v.toLowerCase().trim();
+        if (normalise(ans) === normalise(picks[q.id])) scores[p] += q.pts;
       }
     }
   }
@@ -1234,8 +1235,9 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
         // Fall through to text match if no override set
       }
       const ans = pred.answers[q.id];
-      if (ans && picks[q.id] && ans.toLowerCase().trim() === picks[q.id].toLowerCase().trim()) {
-        scores[p] += q.pts;
+      if (ans && picks[q.id]) {
+        const normalise = v => v.includes("-") ? v.split("-").map(Number).sort((a,b)=>a-b).join("-") : v.toLowerCase().trim();
+        if (normalise(ans) === normalise(picks[q.id])) scores[p] += q.pts;
       }
     }
   }
@@ -1307,7 +1309,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
               ? sfAnswers.length > 0 && playerPick && sfAnswers.includes(playerPick.toLowerCase().trim())
               : q.type === "freetext" && overrideVal !== undefined
                 ? overrideVal === true
-                : correctAnswer && playerPick && correctAnswer.toLowerCase().trim()===playerPick.toLowerCase().trim();
+                : (()=>{ if (!correctAnswer||!playerPick) return false; const n=v=>v.includes("-")?v.split("-").map(Number).sort((a,b)=>a-b).join("-"):v.toLowerCase().trim(); return n(correctAnswer)===n(playerPick); })();
             const hasAnswer = !!correctAnswer || (q.type==="freetext" && overrideVal !== undefined);
 
             return (
@@ -1411,30 +1413,30 @@ function PredictorInput({ q, value, onChange, placeholder }) {
     </select>
   );
   if (q.type === "score") {
-    // Parse "H-A" — only split if value contains a dash with digits either side
+    // Parse "H-A" — default both sides to "0" once user starts selecting
     const parts = (value||"").split("-");
     const home = parts.length >= 2 ? parts[0] : "";
     const away = parts.length >= 2 ? parts[1] : "";
     const opts = ["0","1","2","3","4","5","6","7","8","9","10"];
     const selectStyle = {...S.pickSelect, fontSize:13, marginBottom:0, width:64, textAlign:"center"};
-    const handleChange = (newHome, newAway) => {
-      // Only save if both sides are selected; clear entirely if either is blank
-      if (newHome === "" || newAway === "") {
-        onChange("");
-      } else {
-        onChange(`${newHome}-${newAway}`);
-      }
-    };
     return (
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <select style={selectStyle} value={home}
-          onChange={e=>handleChange(e.target.value, away)}>
+          onChange={e=>{
+            const h = e.target.value;
+            if (h === "") { onChange(""); return; }
+            onChange(`${h}-${away||"0"}`);
+          }}>
           <option value="">-</option>
           {opts.map(n=><option key={n} value={n}>{n}</option>)}
         </select>
         <span style={{color:"#E61D25",fontWeight:700,fontSize:16}}>–</span>
         <select style={selectStyle} value={away}
-          onChange={e=>handleChange(home, e.target.value)}>
+          onChange={e=>{
+            const a = e.target.value;
+            if (a === "") { onChange(""); return; }
+            onChange(`${home||"0"}-${a}`);
+          }}>
           <option value="">-</option>
           {opts.map(n=><option key={n} value={n}>{n}</option>)}
         </select>
