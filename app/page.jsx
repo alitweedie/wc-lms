@@ -374,15 +374,10 @@ function evaluateGameEnd(g, players) {
 }
 
 function usedTeams(game, player, roundIndex) {
-  // Only restrict repeat picks within the group stage (round ids 1-3).
-  // Knockout rounds (id >= 4) are unrestricted — teams can be picked again.
-  const currentRound = game.rounds[roundIndex];
-  const currentWCRound = ROUNDS.find(r => r.id === currentRound?.id);
-  if (!currentWCRound || currentWCRound.id >= 4) return new Set(); // no restriction in knockouts
+  // Track all picks across all rounds — no repeats ever allowed.
   const s = new Set();
   for (const r of game.rounds.slice(0, roundIndex)) {
-    const wcr = ROUNDS.find(wr => wr.id === r.id);
-    if (wcr && wcr.id < 4 && r.picks[player]) s.add(r.picks[player]); // only block group stage picks
+    if (r.picks[player]) s.add(r.picks[player]);
   }
   return s;
 }
