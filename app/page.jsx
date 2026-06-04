@@ -785,40 +785,37 @@ export default function App() {
             </button>
           ))}
         </nav>
-      </header>
-
-      <main style={S.main}>
-        {game.complete&&game.winners.length>0&&(
+      {/* Status banners — pinned in header, tracker tab only */}
+        {tab==="tracker"&&game.complete&&game.winners.length>0&&(
           <div style={S.winnerBanner}>
-            <div style={{fontSize:36}}>🏆</div>
+            <div style={{fontSize:28}}>🏆</div>
             <div>
               <div style={{fontSize:9,letterSpacing:4,color:"rgba(255,255,255,0.9)",textTransform:"uppercase",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>GAME OVER</div>
-              <div style={{fontSize:32,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3}}>{game.winners.join(" & ")} WIN!</div>
-              <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",marginTop:4}}>
-                Prize: £{Math.floor(pot/game.winners.length)} each · Next game starts from the next round
-              </div>
+              <div style={{fontSize:28,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3}}>{game.winners.join(" & ")} WIN!</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",marginTop:2}}>Prize: £{Math.floor(pot/game.winners.length)} each · Next game starts from the next round</div>
             </div>
           </div>
         )}
-        {game.rolledOver&&(
+        {tab==="tracker"&&game.rolledOver&&(
           <div style={S.rolloverBanner}>🔁 Everyone out — £{pot} rolls over to {state.games[gi+1]?.label||"next game"}</div>
         )}
-        {game.rollover>0&&!game.rolledOver&&(
+        {tab==="tracker"&&game.rollover>0&&!game.rolledOver&&(
           <div style={S.rolloverBanner}>🔁 Rollover included: +£{game.rollover} carried into this game's pot</div>
         )}
-
-        {/* Final showdown banners */}
-        {!game.complete&&aliveNow.length===1&&(
-          <div style={{background:"#E61D25",padding:"12px 18px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
-            <span style={{fontSize:26,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff"}}>⚡ LAST MAN STANDING</span>
+        {tab==="tracker"&&!game.complete&&aliveNow.length===1&&(
+          <div style={{background:"#E61D25",padding:"10px 18px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+            <span style={{fontSize:22,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff"}}>⚡ LAST MAN STANDING</span>
             <span style={{fontSize:12,color:"rgba(255,255,255,0.9)",fontWeight:700}}>{aliveNow[0]}</span>
           </div>
         )}
-        {!game.complete&&aliveNow.length>1&&aliveNow.length<=3&&(
-          <div style={{background:"#E61D25",padding:"10px 18px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:22,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff"}}>🔥 FINAL SHOWDOWN — {aliveNow.length} REMAINING</span>
+        {tab==="tracker"&&!game.complete&&aliveNow.length>1&&aliveNow.length<=3&&(
+          <div style={{background:"#E61D25",padding:"8px 18px",display:"flex",alignItems:"center",flexShrink:0}}>
+            <span style={{fontSize:20,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff"}}>🔥 FINAL SHOWDOWN — {aliveNow.length} REMAINING</span>
           </div>
         )}
+      </header>
+
+      <main style={S.main}>
 
         {tab==="tracker"&&(
           <TrackerTab rounds={trackerRounds} game={game} gi={gi} state={state}
@@ -1614,12 +1611,12 @@ function SettingsTab({ state, update, newPlayerName, setNewPlayerName, addPlayer
 // STYLES
 // ═══════════════════════════════════════════════════════════════════════════════
 const S = {
-  root:{minHeight:"100vh",background:"#0e0f14",color:"#fff",fontFamily:"'DM Sans','Helvetica Neue',sans-serif"},
+  root:{display:"flex",flexDirection:"column",height:"100vh",background:"#0e0f14",color:"#fff",fontFamily:"'DM Sans','Helvetica Neue',sans-serif",overflow:"hidden"},
   loadScreen:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0e0f14"},
   spinner:{width:36,height:36,border:"2px solid #1e1f26",borderTop:"2px solid #E61D25",borderRadius:"50%"},
 
   // ── Header ────────────────────────────────────────────────────────────────
-  header:{background:"#0e0f14",position:"sticky",top:0,zIndex:100,borderBottom:"3px solid #E61D25"},
+  header:{background:"#0e0f14",flexShrink:0,zIndex:100,borderBottom:"3px solid #E61D25"},
   headerTop:{display:"flex",alignItems:"center",gap:14,padding:"18px 18px 14px"},
   kicker:{fontSize:9,letterSpacing:4,color:"#E61D25",fontWeight:700,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",marginBottom:6},
   title:{margin:0,fontSize:42,fontWeight:400,letterSpacing:1,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",lineHeight:0.88,textTransform:"uppercase"},
@@ -1642,7 +1639,7 @@ const S = {
   navBtn:{flex:1,padding:"11px 0",background:"transparent",border:"none",color:"#333",fontFamily:"'DM Sans',sans-serif",fontSize:9,letterSpacing:2.5,cursor:"pointer",textTransform:"uppercase",fontWeight:700,borderBottom:"3px solid transparent"},
   navBtnActive:{color:"#fff",borderBottom:"3px solid #E61D25",background:"#0d0d0d"},
 
-  main:{padding:"14px 14px",maxWidth:900,margin:"0 auto"},
+  main:{padding:"14px 14px",maxWidth:900,margin:"0 auto",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},
 
   // ── Banners ───────────────────────────────────────────────────────────────
   winnerBanner:{display:"flex",alignItems:"center",gap:18,background:"#E61D25",padding:"18px 20px",marginBottom:14,borderRadius:3},
