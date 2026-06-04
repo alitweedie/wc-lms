@@ -1239,22 +1239,30 @@ function PredictorInput({ q, value, onChange, placeholder }) {
     </select>
   );
   if (q.type === "score") {
-    // Parse "H-A" into two parts
+    // Parse "H-A" — only split if value contains a dash with digits either side
     const parts = (value||"").split("-");
-    const home = parts[0] || "";
-    const away = parts[1] || "";
+    const home = parts.length >= 2 ? parts[0] : "";
+    const away = parts.length >= 2 ? parts[1] : "";
     const opts = ["0","1","2","3","4","5","6","7","8","9","10"];
     const selectStyle = {...S.pickSelect, fontSize:13, marginBottom:0, width:64, textAlign:"center"};
+    const handleChange = (newHome, newAway) => {
+      // Only save if both sides are selected; clear entirely if either is blank
+      if (newHome === "" || newAway === "") {
+        onChange("");
+      } else {
+        onChange(`${newHome}-${newAway}`);
+      }
+    };
     return (
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <select style={selectStyle} value={home}
-          onChange={e=>onChange(`${e.target.value}-${away||"0"}`)}>
+          onChange={e=>handleChange(e.target.value, away)}>
           <option value="">-</option>
           {opts.map(n=><option key={n} value={n}>{n}</option>)}
         </select>
         <span style={{color:"#c9a84c",fontWeight:700,fontSize:16}}>–</span>
         <select style={selectStyle} value={away}
-          onChange={e=>onChange(`${home||"0"}-${e.target.value}`)}>
+          onChange={e=>handleChange(home, e.target.value)}>
           <option value="">-</option>
           {opts.map(n=><option key={n} value={n}>{n}</option>)}
         </select>
