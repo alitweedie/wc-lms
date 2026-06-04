@@ -167,7 +167,6 @@ const isPlaceholder = t => !t || t.includes("Winner") || t.includes("TBD") || t.
 const realTeams = r => [...new Set(r.fixtures.flatMap(([h,a])=>[h,a]).filter(t=>!isPlaceholder(t)))].sort();
 
 const OUTCOME = { WIN:"win", LOSE:"lose", DRAW:"draw", PENDING:"" };
-const STORAGE_KEY = "wc_lms_v6";
 const POLL_MS = 5000;
 const ENTRY_FEE = 2;
 const PREDICTOR_FEE = 10; // £10 per person for the predictor game
@@ -183,7 +182,6 @@ const ALL_NATIONS = [
   "Sweden","Switzerland","Tunisia","Turkey","Uruguay","USA","Uzbekistan","Wales",
 ].sort();
 
-// Player names for manager red card / sacking picks
 const PREDICTOR_QUESTIONS = [
   // ── 15 points ──────────────────────────────────────────────────────────────
   { id:"winner",      pts:15, label:"Tournament Winner",                              type:"nation",   cat:"15pts" },
@@ -423,7 +421,6 @@ function computeMoneyTracker(state) {
     const picks = pred.picks[p] || {};
     // Semi-finalists are unordered — check both SF picks against both SF answers
     const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"]].filter(Boolean).map(s=>s.toLowerCase().trim());
-    const sfPicks   = [picks["semi1"], picks["semi2"]].filter(Boolean).map(s=>s.toLowerCase().trim());
     for (const q of PREDICTOR_QUESTIONS) {
       if (q.id === "semi1" || q.id === "semi2") {
         // Award pts if this pick appears anywhere in the sf answers pool
@@ -815,7 +812,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                 <div key={player} style={cellStyle}>
                   <div style={S.pickPlayer}>
                     <span style={S.pickPlayerName}>{player}</span>
-                    {satOut&&<span style={{...S.elimBadge,background:"#1e3a2f",color:"#6ee7b7"}}>OUT</span>}
+                    {satOut&&<span style={{...S.elimBadge,background:"#1e3a2f",color:"#6ee7b7"}}>SAT OUT</span>}
                     {!satOut&&!isAlive&&elimMap[player]&&elimMap[player]>0&&
                       <span style={S.elimBadge}>OUT R{elimMap[player]}</span>}
                   </div>
@@ -838,7 +835,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                           {pick?<>{FLAG[pick]||"🏳️"} <strong>{pick}</strong></>:<span style={{color:"#555",fontStyle:"italic"}}>No pick</span>}
                         </div>
                       )}
-                      {pick&&(
+                      {pick&&isEditing&&(
                         <div style={S.outcomeRow}>
                           {[{val:OUTCOME.WIN,label:"W",color:"#4caf50"},{val:OUTCOME.DRAW,label:"D",color:"#f59e0b"},{val:OUTCOME.LOSE,label:"L",color:"#e53935"}].map(({val,label,color})=>(
                             <button key={val}
