@@ -543,6 +543,32 @@ export default function App() {
     }
   });
 
+  // Reopen a round: clear all outcomes, un-complete the game if it was triggered by this round
+  const reopenRound = (gi, roundId) => update(s => {
+    const g = s.games[gi];
+    const r = g.rounds.find(r => r.id === roundId);
+    if (!r) return;
+    // Clear all outcomes for this round
+    for (const p of s.players) {
+      if (r.outcomes[p] !== undefined) r.outcomes[p] = OUTCOME.PENDING;
+    }
+    // If the game was completed, un-complete it and remove the auto-spawned next game
+    if (g.complete) {
+      g.complete = false;
+      g.winners = [];
+      g.rolledOver = false;
+      // Remove the last game if it was auto-spawned as a result of this game completing
+      // (only remove if it has no picks at all yet)
+      if (s.games.length > gi + 1) {
+        const nextGame = s.games[gi + 1];
+        const hasAnyPicks = nextGame.rounds.some(r => Object.values(r.picks).some(p => !!p));
+        if (!hasAnyPicks) {
+          s.games.splice(gi + 1, 1);
+        }
+      }
+    }
+  });
+
   // Set a single player's outcome then check if the game has ended
   const setOutcome = (gi, roundId, player, outcome) => update(s => {
     const g = s.games[gi];
@@ -666,7 +692,7 @@ export default function App() {
         {tab==="tracker"&&(
           <TrackerTab rounds={trackerRounds} game={game} gi={gi} state={state}
             elimMap={elimMap} entrants={entrants} setPick={setPick} setOutcome={setOutcome}
-            closeRound={closeRound}
+            closeRound={closeRound} reopenRound={reopenRound}
             editingRound={editingRound} setEditingRound={setEditingRound} update={update}/>
         )}
         {tab==="fixtures"&&<FixturesTab game={game}/>}
@@ -693,7 +719,7 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRACKER
 // ═══════════════════════════════════════════════════════════════════════════════
-function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, editingRound, setEditingRound, update }) {
+function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, editingRound, setEditingRound, update }) {
   return (
     <div>
       {rounds.map((round, idx) => {
@@ -704,12 +730,41 @@ function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOu
         return (
           <RoundCard key={round.id} round={round} wcRound={wcRound} game={game} gi={gi}
             state={state} aliveAtStart={aliveAtStart} elimMap={elimMap} entrants={entrants}
-            setPick={setPick} setOutcome={setOutcome} closeRound={closeRound} isFirstRound={isFirstRound}
+            setPick={setPick} setOutcome={setOutcome} closeRound={closeRound} reopenRound={reopenRound} isFirstRound={isFirstRound}
             isEditing={editingRound===`${gi}-${round.id}`}
             setEditing={v=>setEditingRound(v?`${gi}-${round.id}`:null)}
             update={update} roundIndex={realRoundIdx}/>
         );
       })}
+    </div>
+  );
+}
+
+function ReopenRoundPanel({ onReopen }) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div style={{padding:"8px 12px",background:"#0d1117",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+      <span style={{fontSize:11,color:"#9ca3af"}}>Clear all outcomes and reopen this round for editing</span>
+      {confirming ? (
+        <div style={{display:"flex",gap:6}}>
+          <button
+            onClick={e=>{e.stopPropagation(); onReopen(); setConfirming(false);}}
+            style={{background:"rgba(245,158,11,0.2)",border:"1px solid #f59e0b",color:"#f59e0b",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+            ✓ CONFIRM
+          </button>
+          <button
+            onClick={e=>{e.stopPropagation(); setConfirming(false);}}
+            style={{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'Oswald',sans-serif"}}>
+            CANCEL
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={e=>{e.stopPropagation(); setConfirming(true);}}
+          style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.4)",color:"#f59e0b",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,letterSpacing:1,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+          ↩ REOPEN ROUND
+        </button>
+      )}
     </div>
   );
 }
@@ -745,7 +800,7 @@ function CloseRoundPanel({ unpickedAlive, onClose }) {
   );
 }
 
-function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, isFirstRound, isEditing, setEditing, update, roundIndex }) {
+function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, isFirstRound, isEditing, setEditing, update, roundIndex }) {
   const resolved = roundResolved(round);
   const survivors = aliveAtStart.filter(p=>round.outcomes[p]===OUTCOME.WIN);
   const ousted = aliveAtStart.filter(p=>
@@ -790,6 +845,9 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
               unpickedAlive={unpickedAlive}
               onClose={() => closeRound(gi, round.id)}
             />
+          )}
+          {isEditing && resolved && (
+            <ReopenRoundPanel onReopen={() => reopenRound(gi, round.id)}/>
           )}
 
           <div style={S.picksGrid}>
