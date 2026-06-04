@@ -717,7 +717,10 @@ export default function App() {
   const gi = state.games.indexOf(game);
   const elimMap = buildElimMap(game, state.players);
   const entrants = gameEntrants(game, state.players);
-  const aliveNow = entrants.filter(p=>elimMap[p]==null);
+  // For the alive counter, only count players who have actually picked in round 1
+  const r0picks = game.rounds[0] ? state.players.filter(p => !!game.rounds[0].picks[p]) : [];
+  const actualEntrants = roundResolved(game.rounds[0]) ? entrants : r0picks;
+  const aliveNow = actualEntrants.filter(p=>elimMap[p]==null);
   const pot = calcPot(game, state.players);
   const syncLabel = syncing?"saving…":lastSync?`synced ${Math.round((Date.now()-lastSync)/1000)}s ago`:"";
   const pred = state.predictor || { picks:{}, answers:{}, locked:false };
