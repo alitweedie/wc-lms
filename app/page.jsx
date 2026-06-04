@@ -374,8 +374,16 @@ function evaluateGameEnd(g, players) {
 }
 
 function usedTeams(game, player, roundIndex) {
+  // Only restrict repeat picks within the group stage (round ids 1-3).
+  // Knockout rounds (id >= 4) are unrestricted — teams can be picked again.
+  const currentRound = game.rounds[roundIndex];
+  const currentWCRound = ROUNDS.find(r => r.id === currentRound?.id);
+  if (!currentWCRound || currentWCRound.id >= 4) return new Set(); // no restriction in knockouts
   const s = new Set();
-  for (const r of game.rounds.slice(0, roundIndex)) if (r.picks[player]) s.add(r.picks[player]);
+  for (const r of game.rounds.slice(0, roundIndex)) {
+    const wcr = ROUNDS.find(wr => wr.id === r.id);
+    if (wcr && wcr.id < 4 && r.picks[player]) s.add(r.picks[player]); // only block group stage picks
+  }
   return s;
 }
 
@@ -868,7 +876,11 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
               const pick = round.picks[player];
               const outcome = round.outcomes[player];
               const used = usedTeams(game, player, roundIndex);
-              const availTeams = wcRound ? realTeams(wcRound) : [];
+              // Group stage: only show teams playing that round. Knockouts: show all nations.
+              const isKnockout = wcRound && wcRound.id >= 4;
+              const availTeams = wcRound
+                ? (isKnockout ? ALL_NATIONS : realTeams(wcRound))
+                : ALL_NATIONS;
 
               let cellStyle = {...S.pickCell};
               if (satOut) cellStyle={...cellStyle,...S.pickCellSatOut};
