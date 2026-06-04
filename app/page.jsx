@@ -587,7 +587,17 @@ export default function App() {
   const setPredictorPick = (player, questionId, answer) => update(s => {
     if (!s.predictor) s.predictor = { picks:{}, answers:{}, locked:false };
     if (!s.predictor.picks[player]) s.predictor.picks[player] = {};
-    s.predictor.picks[player][questionId] = answer;
+    if (answer === "" || answer === null || answer === undefined) {
+      // Remove empty picks so entrant detection stays accurate
+      delete s.predictor.picks[player][questionId];
+    } else {
+      s.predictor.picks[player][questionId] = answer;
+    }
+    // If no non-tiebreak picks remain, remove the player entry entirely
+    const remaining = Object.keys(s.predictor.picks[player]).filter(id => id !== "tiebreak");
+    if (remaining.length === 0) {
+      delete s.predictor.picks[player];
+    }
   });
 
   const setPredictorAnswer = (questionId, answer) => update(s => {
