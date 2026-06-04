@@ -807,6 +807,19 @@ export default function App() {
           <div style={S.rolloverBanner}>🔁 Rollover included: +£{game.rollover} carried into this game's pot</div>
         )}
 
+        {/* Final showdown banners */}
+        {!game.complete&&aliveNow.length===1&&(
+          <div style={{background:"#E61D25",padding:"12px 18px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:26,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff"}}>⚡ LAST MAN STANDING</span>
+            <span style={{fontSize:12,color:"rgba(255,255,255,0.9)",fontWeight:700}}>{aliveNow[0]}</span>
+          </div>
+        )}
+        {!game.complete&&aliveNow.length>1&&aliveNow.length<=3&&(
+          <div style={{background:"#E61D25",padding:"10px 18px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:22,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff"}}>🔥 FINAL SHOWDOWN — {aliveNow.length} REMAINING</span>
+          </div>
+        )}
+
         {tab==="tracker"&&(
           <TrackerTab rounds={trackerRounds} game={game} gi={gi} state={state}
             elimMap={elimMap} entrants={entrants} setPick={setPick} setOutcome={setOutcome}
