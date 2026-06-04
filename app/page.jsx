@@ -94,30 +94,30 @@ const ROUNDS = [
     deadline:"Thu 26 Jun, 16:00 BST",
     note:"Final group games. Simultaneous kick-offs — must WIN, no draws.",
     fixtures:[
-      ["South Africa","Mexico","Fri 27 Jun","20:00 BST"],
-      ["South Korea","Canada","Fri 27 Jun","20:00 BST"],
-      ["Bosnia & Herz.","Qatar","Fri 27 Jun","23:00 BST"],
-      ["Switzerland","Australia","Fri 27 Jun","23:00 BST"],
-      ["Haiti","Morocco","Sat 28 Jun","20:00 BST"],
-      ["Scotland","Brazil","Sat 28 Jun","20:00 BST"],
-      ["Turkey","USA","Sat 28 Jun","23:00 BST"],
-      ["Czechia","Mexico","Sat 28 Jun","23:00 BST"],
-      ["Ecuador","Germany","Sun 29 Jun","20:00 BST"],
-      ["Curaçao","Ivory Coast","Sun 29 Jun","20:00 BST"],
-      ["Sweden","Netherlands","Sun 29 Jun","23:00 BST"],
-      ["Tunisia","Japan","Sun 29 Jun","23:00 BST"],
-      ["Cape Verde","Spain","Mon 30 Jun","20:00 BST"],
-      ["Uruguay","Saudi Arabia","Mon 30 Jun","20:00 BST"],
-      ["Egypt","Belgium","Mon 30 Jun","23:00 BST"],
-      ["New Zealand","Iran","Mon 30 Jun","23:00 BST"],
-      ["Senegal","France","Tue 1 Jul","20:00 BST"],
-      ["Iraq","Norway","Tue 1 Jul","20:00 BST"],
-      ["Jordan","Argentina","Tue 1 Jul","23:00 BST"],
-      ["Algeria","Austria","Tue 1 Jul","23:00 BST"],
-      ["Croatia","England","Wed 2 Jul","20:00 BST"],
-      ["Panama","Ghana","Wed 2 Jul","20:00 BST"],
-      ["Colombia","Portugal","Wed 2 Jul","23:00 BST"],
-      ["Uzbekistan","DR Congo","Wed 2 Jul","23:00 BST"],
+      ["Mexico","Czechia","Sat 27 Jun","20:00 BST"],
+      ["South Africa","South Korea","Sat 27 Jun","20:00 BST"],
+      ["Switzerland","Canada","Sat 27 Jun","23:00 BST"],
+      ["Qatar","Bosnia & Herz.","Sat 27 Jun","23:00 BST"],
+      ["Scotland","Brazil","Sun 28 Jun","20:00 BST"],
+      ["Haiti","Morocco","Sun 28 Jun","20:00 BST"],
+      ["USA","Turkey","Sun 28 Jun","23:00 BST"],
+      ["Australia","Paraguay","Sun 28 Jun","23:00 BST"],
+      ["Ecuador","Germany","Mon 29 Jun","20:00 BST"],
+      ["Curaçao","Ivory Coast","Mon 29 Jun","20:00 BST"],
+      ["Sweden","Netherlands","Mon 29 Jun","23:00 BST"],
+      ["Tunisia","Japan","Mon 29 Jun","23:00 BST"],
+      ["Spain","Uruguay","Tue 30 Jun","20:00 BST"],
+      ["Saudi Arabia","Cape Verde","Tue 30 Jun","20:00 BST"],
+      ["Iran","Egypt","Tue 30 Jun","23:00 BST"],
+      ["Belgium","New Zealand","Tue 30 Jun","23:00 BST"],
+      ["Norway","France","Wed 1 Jul","20:00 BST"],
+      ["Senegal","Iraq","Wed 1 Jul","20:00 BST"],
+      ["Argentina","Jordan","Wed 1 Jul","23:00 BST"],
+      ["Algeria","Austria","Wed 1 Jul","23:00 BST"],
+      ["England","Panama","Thu 2 Jul","20:00 BST"],
+      ["Croatia","Ghana","Thu 2 Jul","20:00 BST"],
+      ["Portugal","Colombia","Thu 2 Jul","23:00 BST"],
+      ["Uzbekistan","DR Congo","Thu 2 Jul","23:00 BST"],
     ],
   },
   {
@@ -166,8 +166,9 @@ const ROUNDS = [
   {
     id:8, label:"Final", stage:"Final",
     deadline:"Sat 26 Jul, 19:00 BST",
-    note:"The World Cup Final at MetLife Stadium, New Jersey.",
+    note:"The World Cup Final at MetLife Stadium, New Jersey. Tiebreaker: predict the minute of the first goal.",
     fixtures:[["SF M1 Winner","SF M2 Winner","Sun 27 Jul","20:00"]],
+    hasTiebreaker: true,
   },
 ];
 
@@ -193,9 +194,11 @@ const ALL_NATIONS = [
 const PREDICTOR_QUESTIONS = [
   // ── 15 points ──────────────────────────────────────────────────────────────
   { id:"winner",      pts:15, label:"Tournament Winner",                              type:"nation",   cat:"15pts" },
-  { id:"runner_up",   pts:15, label:"Runner-Up (finalist who loses)",                 type:"nation",   cat:"15pts" },
+  { id:"runner_up",   pts:15, label:"Runner-Up",                                      type:"nation",   cat:"15pts" },
   { id:"semi1",       pts:15, label:"Semi-Finalist #1",                               type:"nation",   cat:"15pts" },
   { id:"semi2",       pts:15, label:"Semi-Finalist #2",                               type:"nation",   cat:"15pts" },
+  { id:"semi3",       pts:15, label:"Semi-Finalist #3",                               type:"nation",   cat:"15pts" },
+  { id:"semi4",       pts:15, label:"Semi-Finalist #4",                               type:"nation",   cat:"15pts" },
   { id:"golden_boot", pts:15, label:"Golden Boot – Top Scorer (player name)",         type:"freetext", cat:"15pts" },
   { id:"most_concede",pts:15, label:"Nation that concedes the most goals",            type:"nation",   cat:"15pts" },
   // ── Group Winners – 5 points each ──────────────────────────────────────────
@@ -242,7 +245,7 @@ async function saveData(d) {
 function buildGame(id, startRoundIdx=0) {
   return {
     id, label:`Game ${id}`, startRoundIdx,
-    rounds: ROUNDS.slice(startRoundIdx).map(r=>({ id:r.id, label:r.label, stage:r.stage, picks:{}, outcomes:{} })),
+    rounds: ROUNDS.slice(startRoundIdx).map(r=>({ id:r.id, label:r.label, stage:r.stage, picks:{}, outcomes:{}, tiebreaker:{} })),
     complete:false, winners:[], rollover:0,
   };
 }
@@ -360,18 +363,38 @@ function evaluateGameEnd(g, players) {
   if (lastSettledIdx < 0) return; // nothing settled yet
 
   const entrants = gameEntrants(g, players);
+  const lastRound = g.rounds[lastSettledIdx];
+  const isFinalRound = lastSettledIdx === g.rounds.length - 1;
+
+  // Count survivors of the last fully-settled round (players who got WIN)
+  const survivors = entrants.filter(p => lastRound.outcomes[p] === OUTCOME.WIN);
+  // Count players eliminated at or before this round
   const elimMap = buildElimMap(g, players);
   const alive = entrants.filter(p => elimMap[p] == null);
-  const isFinalRound = lastSettledIdx === g.rounds.length - 1;
-  const lastRound = g.rounds[lastSettledIdx];
-  const survivors = entrants.filter(p => lastRound.outcomes[p] === OUTCOME.WIN);
 
-  const gameOver = alive.length === 1 || alive.length === 0 || (isFinalRound && survivors.length > 0);
+  // Game ends when:
+  // - Exactly 1 player survives the last settled round (last man standing)
+  // - Nobody survives (rollover)
+  // - It's the final round and someone won
+  // IMPORTANT: we use survivors from lastRound (not alive) to avoid
+  // triggering game-end mid-round when others still have PENDING outcomes.
+  const roundSurvivors = survivors.length;
+  const roundEliminated = entrants.filter(p =>
+    lastRound.outcomes[p] === OUTCOME.LOSE || lastRound.outcomes[p] === OUTCOME.DRAW
+  ).length;
+  const roundPending = entrants.filter(p =>
+    !lastRound.outcomes[p] || lastRound.outcomes[p] === OUTCOME.PENDING
+  ).length;
+
+  // Don't end the game if any entrant still has a pending outcome in this round
+  if (roundPending > 0) return;
+
+  const gameOver = roundSurvivors <= 1 || isFinalRound;
   if (!gameOver) return;
 
   g.complete = true;
-  g.winners = alive.length === 1 ? alive : (isFinalRound && survivors.length > 0 ? survivors : []);
-  if (alive.length === 0) g.rolledOver = true;
+  g.winners = roundSurvivors === 1 ? survivors : (isFinalRound && roundSurvivors > 0 ? survivors : []);
+  if (roundSurvivors === 0) g.rolledOver = true;
 
   const pot = calcPot(g, players);
   const wcIdx = ROUNDS.findIndex(wr => wr.id === lastRound.id);
@@ -431,9 +454,9 @@ function computeMoneyTracker(state) {
     scores[p] = 0;
     const picks = pred.picks[p] || {};
     // Semi-finalists are unordered — check both SF picks against both SF answers
-    const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"]].filter(Boolean).map(s=>s.toLowerCase().trim());
+    const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).map(s=>s.toLowerCase().trim());
     for (const q of PREDICTOR_QUESTIONS) {
-      if (q.id === "semi1" || q.id === "semi2") {
+      if (q.id === "semi1" || q.id === "semi2" || q.id === "semi3" || q.id === "semi4") {
         // Award pts if this pick appears anywhere in the sf answers pool
         const pick = (picks[q.id]||"").toLowerCase().trim();
         if (pick && sfAnswers.includes(pick)) scores[p] += q.pts;
@@ -525,6 +548,11 @@ export default function App() {
       return next;
     });
   }, []);
+
+  const setTiebreaker = (gi, roundId, player, value) => update(s => {
+    const r = s.games[gi].rounds.find(r => r.id === roundId);
+    if (r) { if (!r.tiebreaker) r.tiebreaker = {}; r.tiebreaker[player] = value; }
+  });
 
   const setPick = (gi, roundId, player, team) => update(s => {
     const r = s.games[gi].rounds.find(r=>r.id===roundId);
@@ -733,7 +761,7 @@ export default function App() {
         {tab==="tracker"&&(
           <TrackerTab rounds={trackerRounds} game={game} gi={gi} state={state}
             elimMap={elimMap} entrants={entrants} setPick={setPick} setOutcome={setOutcome}
-            closeRound={closeRound} reopenRound={reopenRound}
+            closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker}
             editingRound={editingRound} setEditingRound={setEditingRound} update={update}/>
         )}
         {tab==="fixtures"&&<FixturesTab game={game}/>}
@@ -760,7 +788,7 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRACKER
 // ═══════════════════════════════════════════════════════════════════════════════
-function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, editingRound, setEditingRound, update }) {
+function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, editingRound, setEditingRound, update }) {
   return (
     <div>
       {rounds.map((round, idx) => {
@@ -771,7 +799,7 @@ function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOu
         return (
           <RoundCard key={round.id} round={round} wcRound={wcRound} game={game} gi={gi}
             state={state} aliveAtStart={aliveAtStart} elimMap={elimMap} entrants={entrants}
-            setPick={setPick} setOutcome={setOutcome} closeRound={closeRound} reopenRound={reopenRound} isFirstRound={isFirstRound}
+            setPick={setPick} setOutcome={setOutcome} closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker} isFirstRound={isFirstRound}
             isEditing={editingRound===`${gi}-${round.id}`}
             setEditing={v=>setEditingRound(v?`${gi}-${round.id}`:null)}
             update={update} roundIndex={realRoundIdx}/>
@@ -841,7 +869,7 @@ function CloseRoundPanel({ unpickedAlive, onClose }) {
   );
 }
 
-function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, isFirstRound, isEditing, setEditing, update, roundIndex }) {
+function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, isFirstRound, isEditing, setEditing, update, roundIndex }) {
   const resolved = roundResolved(round);
   const survivors = aliveAtStart.filter(p=>round.outcomes[p]===OUTCOME.WIN);
   const ousted = aliveAtStart.filter(p=>
@@ -963,6 +991,62 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
           {resolved&&(
             <div style={S.resultBar}>
               ✓ {survivors.length} survive{survivors.length>0?` · ${survivors.join(", ")}`:""} · ✗ {ousted.length} out
+            </div>
+          )}
+
+          {wcRound?.hasTiebreaker&&(
+            <div style={{padding:"12px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26"}}>
+              <div style={{fontSize:9,letterSpacing:3,color:"#E61D25",textTransform:"uppercase",fontWeight:700,marginBottom:8,fontFamily:"'DM Sans',sans-serif"}}>
+                ⚡ TIEBREAKER — Minute of first goal in the Final
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:1,background:"#1e1f26"}}>
+                {state.players.map(player => {
+                  const tbVal = (round.tiebreaker||{})[player] || "";
+                  const isAlivePlayer = aliveAtStart.includes(player);
+                  if (!isAlivePlayer) return null;
+                  return (
+                    <div key={player} style={{background:"#13141a",padding:"10px 12px"}}>
+                      <div style={{fontSize:11,fontWeight:700,color:"#fff",letterSpacing:0.5,textTransform:"uppercase",marginBottom:5}}>{player}</div>
+                      {resolved ? (
+                        <div style={{fontSize:12,color:"#888"}}>{tbVal ? `Minute ${tbVal}` : <span style={{color:"#333"}}>no guess</span>}</div>
+                      ) : (
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <input
+                            type="number" min="1" max="120"
+                            style={{...S.editInput,width:64,padding:"4px 8px",fontSize:12,flex:"none"}}
+                            placeholder="min"
+                            value={tbVal}
+                            onChange={e=>setTiebreaker(gi,round.id,player,e.target.value)}
+                          />
+                          <span style={{fontSize:10,color:"#444"}}>min</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Admin: set correct minute */}
+              {isEditing&&(
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10}}>
+                  <span style={{fontSize:9,letterSpacing:2,color:"#444",textTransform:"uppercase",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Correct minute:</span>
+                  <input type="number" min="1" max="120"
+                    style={{...S.editInput,width:72,padding:"4px 8px",fontSize:12,flex:"none"}}
+                    placeholder="e.g. 23"
+                    value={(round.tiebreaker||{})["__answer__"]||""}
+                    onChange={e=>setTiebreaker(gi,round.id,"__answer__",e.target.value)}
+                  />
+                </div>
+              )}
+              {(()=>{
+                if (survivors.length<=1) return null;
+                const adminMin = parseFloat((round.tiebreaker||{})["__answer__"]||"");
+                if (isNaN(adminMin)||!adminMin) return null;
+                const tbEntries = Object.entries(round.tiebreaker||{}).filter(([p,v])=>v&&p!=="__answer__"&&aliveAtStart.includes(p));
+                let best = Infinity;
+                tbEntries.forEach(([,v])=>{ const d=Math.abs(parseFloat(v)-adminMin); if(d<best) best=d; });
+                const tbWinner = tbEntries.filter(([,v])=>Math.abs(parseFloat(v)-adminMin)===best).map(([p])=>p);
+                return <div style={{marginTop:8,fontSize:11,color:"#a8e031",fontWeight:700}}>⚡ Tiebreaker: {tbWinner.join(" & ")} (closest to min {adminMin})</div>;
+              })()}
             </div>
           )}
         </>
@@ -1117,13 +1201,13 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
   };
 
   // Score computation — semi-finalists are unordered
-  const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"]].filter(Boolean).map(s=>s.toLowerCase().trim());
+  const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).map(s=>s.toLowerCase().trim());
   const scores = {};
   for (const p of state.players) {
     scores[p] = 0;
     const picks = pred.picks[p] || {};
     for (const q of PREDICTOR_QUESTIONS) {
-      if (q.id === "semi1" || q.id === "semi2") {
+      if (q.id === "semi1" || q.id === "semi2" || q.id === "semi3" || q.id === "semi4") {
         const pick = (picks[q.id]||"").toLowerCase().trim();
         if (pick && sfAnswers.includes(pick)) scores[p] += q.pts;
         continue;
@@ -1190,7 +1274,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
           {PREDICTOR_QUESTIONS.filter(q=>q.cat===cat).map(q=>{
             const playerPick = (pred.picks[selectedPlayer]||{})[q.id] || "";
             const correctAnswer = pred.answers[q.id] || "";
-            const isCorrect = q.id === "semi1" || q.id === "semi2"
+            const isCorrect = q.id === "semi1" || q.id === "semi2" || q.id === "semi3" || q.id === "semi4"
               ? sfAnswers.length > 0 && playerPick && sfAnswers.includes(playerPick.toLowerCase().trim())
               : correctAnswer && playerPick && correctAnswer.toLowerCase().trim()===playerPick.toLowerCase().trim();
             const hasAnswer = !!correctAnswer;
