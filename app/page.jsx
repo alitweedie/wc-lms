@@ -1203,7 +1203,7 @@ function MoneyTab({ state }) {
 function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredictorOverride, togglePredictorLock }) {
   const pred = state.predictor || { picks:{}, answers:{}, locked:false };
   const [adminMode, setAdminMode] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState(state.players[0]);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   // Group questions by category
   const cats = ["15pts","Groups","5pts","Tiebreaker"];
@@ -1288,14 +1288,21 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
         </div>
       )}
 
+      {/* No player selected prompt */}
+      {!adminMode&&!selectedPlayer&&(
+        <div style={{padding:"20px 0",textAlign:"center",color:"#444",fontSize:12,letterSpacing:1}}>
+          ↑ SELECT YOUR NAME ABOVE TO MAKE YOUR PICKS
+        </div>
+      )}
+
       {/* Questions */}
-      {cats.map(cat=>(
+      {(adminMode||selectedPlayer)&&cats.map(cat=>(
         <div key={cat} style={{marginBottom:16}}>
           <div style={S.predCatHeader}>{catLabels[cat]}</div>
           {PREDICTOR_QUESTIONS.filter(q=>q.cat===cat).map(q=>{
-            const playerPick = (pred.picks[selectedPlayer]||{})[q.id] || "";
+            const playerPick = selectedPlayer ? ((pred.picks[selectedPlayer]||{})[q.id] || "") : "";
             const correctAnswer = pred.answers[q.id] || "";
-            const overrideVal = (pred.overrides||{})[q.id]?.[selectedPlayer];
+            const overrideVal = selectedPlayer ? (pred.overrides||{})[q.id]?.[selectedPlayer] : undefined;
             const isCorrect = q.id === "semi1" || q.id === "semi2" || q.id === "semi3" || q.id === "semi4"
               ? sfAnswers.length > 0 && playerPick && sfAnswers.includes(playerPick.toLowerCase().trim())
               : q.type === "freetext" && overrideVal !== undefined
