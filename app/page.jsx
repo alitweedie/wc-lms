@@ -412,7 +412,7 @@ function computeMoneyTracker(state) {
 
   // Predictor entry and winnings
   const pred = state.predictor || { picks:{}, answers:{}, locked:false };
-  const predEntrants = state.players.filter(p => pred.picks[p] && Object.keys(pred.picks[p]).some(id => id !== "tiebreak"));
+  const predEntrants = state.players.filter(p => pred.picks[p] && Object.keys(pred.picks[p]).some(id => id !== "tiebreak" && pred.picks[p][id] !== "" && pred.picks[p][id] !== null && pred.picks[p][id] !== undefined));
   const predPot = predEntrants.length * PREDICTOR_FEE;
   // Score each player
   const scores = {};
@@ -1100,7 +1100,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
     }
   }
   const maxPts = PREDICTOR_QUESTIONS.reduce((s,q)=>s+q.pts,0);
-  const predEntrants = state.players.filter(p => pred.picks[p] && Object.keys(pred.picks[p]).some(id => id !== "tiebreak"));
+  const predEntrants = state.players.filter(p => pred.picks[p] && Object.keys(pred.picks[p]).some(id => id !== "tiebreak" && pred.picks[p][id] !== "" && pred.picks[p][id] !== null && pred.picks[p][id] !== undefined));
   const pot = predEntrants.length * PREDICTOR_FEE;
 
   return (
