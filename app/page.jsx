@@ -1,6 +1,14 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 
+// Load Bebas Neue + DM Sans from Google Fonts
+if (typeof document !== "undefined") {
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap";
+  document.head.appendChild(link);
+}
+
 const FLAG = {
   "Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Czechia":"🇨🇿",
   "Canada":"🇨🇦","Wales":"🏴󠁧󠁢󠁷󠁬󠁳󠁿","Croatia":"🇭🇷","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
@@ -627,7 +635,7 @@ export default function App() {
 
   if (loading) return (
     <div style={S.loadScreen}><div style={S.spinner}/>
-      <p style={{color:"#c9a84c",marginTop:16,fontFamily:"'Oswald',sans-serif",letterSpacing:4}}>LOADING…</p>
+      <p style={{color:"#e61d25",marginTop:16,fontFamily:"'Inter',sans-serif",letterSpacing:4}}>LOADING…</p>
     </div>
   );
 
@@ -638,6 +646,9 @@ export default function App() {
   const aliveNow = entrants.filter(p=>elimMap[p]==null);
   const pot = calcPot(game, state.players);
   const syncLabel = syncing?"saving…":lastSync?`synced ${Math.round((Date.now()-lastSync)/1000)}s ago`:"";
+  const pred = state.predictor || { picks:{}, answers:{}, locked:false };
+  const predEntrantCount = state.players.filter(p => pred.picks[p] && Object.keys(pred.picks[p]).some(id => id !== "tiebreak" && pred.picks[p][id] !== "" && pred.picks[p][id] !== null && pred.picks[p][id] !== undefined)).length;
+  const predPotTotal = predEntrantCount * PREDICTOR_FEE;
 
   // Show played rounds (collapsed by default) on complete games; all rounds while in progress
   const lastResolvedIdx = game.rounds.reduce((acc,r,i)=>roundResolved(r)?i:acc, -1);
@@ -648,18 +659,35 @@ export default function App() {
   return (
     <div style={S.root}>
       <header style={S.header}>
-        <div style={S.headerInner}>
-          <div style={S.trophy}>🏆</div>
+        <div style={S.headerTop}>
           <div style={{flex:1,minWidth:0}}>
-            <h1 style={S.title}>LAST MAN STANDING</h1>
-            <p style={S.subtitle}>
-              World Cup 2026 · £{ENTRY_FEE}/game · Pot: <strong style={{color:"#c9a84c"}}>£{pot}</strong>
-              {"  "}<span style={{color:syncing?"#f59e0b":"#4ade80",fontSize:10}}>● {syncLabel}</span>
-            </p>
+            <div style={S.kicker}>FIFA WORLD CUP 2026</div>
+            <h1 style={S.title}>LAST MAN<br/>STANDING</h1>
           </div>
           <div style={S.aliveCount}>
-            <span style={S.aliveNum}>{game.complete?"🏆":aliveNow.length}</span>
+            <span style={S.aliveNum}>{game.complete?"✓":aliveNow.length}</span>
             <span style={S.aliveLabel}>{game.complete?"DONE":"ALIVE"}</span>
+          </div>
+        </div>
+        <div style={S.statStrip}>
+          <div style={S.statItem}>
+            <span style={S.statLabel}>Players</span>
+            <span style={S.statValue}>{state.players.length}</span>
+          </div>
+          <div style={S.statDivider}/>
+          <div style={S.statItem}>
+            <span style={S.statLabel}>LMS Pot</span>
+            <span style={{...S.statValue,color:"#a8e031"}}>£{pot}</span>
+          </div>
+          <div style={S.statDivider}/>
+          <div style={S.statItem}>
+            <span style={S.statLabel}>Predict Pot</span>
+            <span style={{...S.statValue,color:"#a8e031"}}>£{predPotTotal}</span>
+          </div>
+          <div style={S.statDivider}/>
+          <div style={S.statItem}>
+            <span style={S.statLabel}>Status</span>
+            <span style={{...S.statValue,fontSize:13,color:syncing?"#f5a623":"#a8e031"}}>● {syncing?"SAVING":"LIVE"}</span>
           </div>
         </div>
         {state.games.length>1&&(
@@ -687,9 +715,9 @@ export default function App() {
           <div style={S.winnerBanner}>
             <div style={{fontSize:36}}>🏆</div>
             <div>
-              <div style={{fontSize:10,letterSpacing:3,color:"#c9a84c"}}>GAME OVER</div>
-              <div style={{fontSize:20,fontWeight:900,color:"#fff"}}>{game.winners.join(" & ")} WIN!</div>
-              <div style={{fontSize:12,color:"#c9a84c",marginTop:2}}>
+              <div style={{fontSize:9,letterSpacing:4,color:"rgba(255,255,255,0.9)",textTransform:"uppercase",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>GAME OVER</div>
+              <div style={{fontSize:32,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3}}>{game.winners.join(" & ")} WIN!</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",marginTop:4}}>
                 Prize: £{Math.floor(pot/game.winners.length)} each · Next game starts from the next round
               </div>
             </div>
@@ -762,7 +790,7 @@ function ReopenRoundPanel({ onReopen }) {
         <div style={{display:"flex",gap:6}}>
           <button
             onClick={e=>{e.stopPropagation(); onReopen(); setConfirming(false);}}
-            style={{background:"rgba(245,158,11,0.2)",border:"1px solid #f59e0b",color:"#f59e0b",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+            style={{background:"rgba(245,158,11,0.2)",border:"1px solid #f59e0b",color:"#a8e031",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
             ✓ CONFIRM
           </button>
           <button
@@ -774,7 +802,7 @@ function ReopenRoundPanel({ onReopen }) {
       ) : (
         <button
           onClick={e=>{e.stopPropagation(); setConfirming(true);}}
-          style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.4)",color:"#f59e0b",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,letterSpacing:1,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+          style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.4)",color:"#a8e031",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,letterSpacing:1,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
           ↩ REOPEN ROUND
         </button>
       )}
@@ -899,7 +927,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                       {!resolved?(
                         <select style={S.pickSelect} value={pick||""}
                           onChange={e=>setPick(gi,round.id,player,e.target.value)}>
-                          <option value="">{isFirstRound?"— pick to enter / leave blank to sit out —":"— pick a team —"}</option>
+                          <option value="">{isFirstRound?"— select team to enter —":"— select team —"}</option>
                           {availTeams.map(t=>{
                             const wasUsed=used.has(t);
                             return <option key={t} value={t} disabled={wasUsed}>{FLAG[t]||"🏳️"} {t}{wasUsed?" ✗":""}</option>;
@@ -912,7 +940,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                       )}
                       {pick&&isEditing&&(
                         <div style={S.outcomeRow}>
-                          {[{val:OUTCOME.WIN,label:"W",color:"#4caf50"},{val:OUTCOME.DRAW,label:"D",color:"#f59e0b"},{val:OUTCOME.LOSE,label:"L",color:"#e53935"}].map(({val,label,color})=>(
+                          {[{val:OUTCOME.WIN,label:"W",color:"#a8e031"},{val:OUTCOME.DRAW,label:"D",color:"#a8e031"},{val:OUTCOME.LOSE,label:"L",color:"#e53935"}].map(({val,label,color})=>(
                             <button key={val}
                               onClick={()=>setOutcome(gi,round.id,player,outcome===val?OUTCOME.PENDING:val)}
                               style={{...S.outcomeBtn,...(outcome===val?{background:color,color:"#0a0a0f",borderColor:color}:{color})}}>
@@ -1024,7 +1052,7 @@ function MoneyTab({ state }) {
                 ))}
               </div>
             </div>
-            <div style={{...S.moneyNet,...(isUp?{color:"#4caf50"}:isEven?{color:"#9ca3af"}:{color:"#e53935"})}}>
+            <div style={{...S.moneyNet,...(isUp?{color:"#a8e031"}:isEven?{color:"#9ca3af"}:{color:"#e53935"})}}>
               {isUp?"+":""}{net < 0 ? `-£${Math.abs(net)}` : `£${net}`}
             </div>
           </div>
@@ -1041,8 +1069,8 @@ function MoneyTab({ state }) {
             <div style={S.moneyGameHeader}>
               <span style={{fontWeight:700,color:"#fff",fontSize:13}}>{game.label}</span>
               <span style={{fontSize:11,color:"#888"}}>
-                {entrants.length} entered · Pot: <strong style={{color:"#c9a84c"}}>£{pot}</strong>
-                {game.rollover>0&&<span style={{color:"#f59e0b"}}> (incl. £{game.rollover} rollover)</span>}
+                {entrants.length} entered · Pot: <strong style={{color:"#a8e031"}}>£{pot}</strong>
+                {game.rollover>0&&<span style={{color:"#a8e031"}}> (incl. £{game.rollover} rollover)</span>}
               </span>
               <span style={{fontSize:11,color:game.complete?(game.winners.length>0?"#4caf50":"#f59e0b"):"#6b7280"}}>
                 {game.complete?(game.winners.length>0?`🏆 ${game.winners.join(", ")} won £${Math.floor(pot/game.winners.length)}`:"🔁 Rollover"):"In progress"}
@@ -1055,9 +1083,9 @@ function MoneyTab({ state }) {
                 return (
                   <span key={p} style={{
                     fontSize:10,padding:"3px 8px",borderRadius:12,
-                    background: won?"rgba(201,168,76,0.2)":entered?"rgba(76,175,80,0.1)":"rgba(100,100,100,0.1)",
-                    border: won?"1px solid rgba(201,168,76,0.5)":entered?"1px solid rgba(76,175,80,0.2)":"1px solid #222",
-                    color: won?"#c9a84c":entered?"#9ca3af":"#444",
+                    background: won?"#0a150a":entered?"rgba(76,175,80,0.1)":"rgba(100,100,100,0.1)",
+                    border: won?"1px solid #a8e031":entered?"1px solid rgba(76,175,80,0.2)":"1px solid #222",
+                    color: won?"#a8e031":entered?"#9ca3af":"#444",
                   }}>
                     {p}{won?" 🏆":entered?" -£2":" –"}
                   </span>
@@ -1117,17 +1145,17 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
         <div>
           <h2 style={{...S.sectionTitle,marginBottom:4}}>TOURNAMENT PREDICTOR</h2>
           <p style={{fontSize:11,color:"#9ca3af",fontFamily:"sans-serif",margin:0}}>
-            £{PREDICTOR_FEE} entry · {predEntrants.length} entered · Pot: <strong style={{color:"#c9a84c"}}>£{pot}</strong>
+            £{PREDICTOR_FEE} entry · {predEntrants.length} entered · Pot: <strong style={{color:"#a8e031"}}>£{pot}</strong>
           </p>
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>
           <button onClick={()=>setAdminMode(a=>!a)}
-            style={{...S.editBtn, background: adminMode?"rgba(201,168,76,0.2)":"transparent", color: adminMode?"#c9a84c":"#9ca3af"}}>
+            style={{...S.editBtn, background: adminMode?"#E61D25":"transparent", color: adminMode?"#fff":"#9ca3af"}}>
             {adminMode ? "✓ ADMIN" : "ADMIN"}
           </button>
           {adminMode&&(
             <button onClick={togglePredictorLock}
-              style={{...S.editBtn, color: pred.locked?"#4caf50":"#e53935"}}>
+              style={{...S.editBtn, color: pred.locked?"#a8e031":"#3a3a3a"}}>
               {pred.locked ? "🔒 LOCKED" : "🔓 OPEN"}
             </button>
           )}
@@ -1143,9 +1171,9 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
                 style={{
                   padding:"5px 12px",borderRadius:20,border:"1px solid",cursor:"pointer",fontSize:12,
                   fontFamily:"'Oswald',sans-serif",letterSpacing:1,
-                  background: selectedPlayer===p?"#c9a84c":"transparent",
+                  background: selectedPlayer===p?"#E61D25":"transparent",
                   color: selectedPlayer===p?"#0a0a0f":"#9ca3af",
-                  borderColor: selectedPlayer===p?"#c9a84c":"#374151",
+                  borderColor: selectedPlayer===p?"#E61D25":"#1c1c1c",
                 }}>
                 {p}
               </button>
@@ -1177,7 +1205,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
                   <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                     {q.pts>0&&<span style={S.predPtsBadge}>{q.pts}pts</span>}
                     <span style={{fontSize:12,color:"#e5e7eb",fontWeight:600}}>{q.label}</span>
-                    {isCorrect&&<span style={{color:"#4caf50",fontSize:12}}>✓</span>}
+                    {isCorrect&&<span style={{color:"#a8e031",fontSize:12}}>✓</span>}
                     {hasAnswer&&playerPick&&!isCorrect&&<span style={{color:"#e53935",fontSize:12}}>✗</span>}
                   </div>
 
@@ -1199,7 +1227,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
                         {state.players.map(p=>{
                           const pp = (pred.picks[p]||{})[q.id];
                           if (!pp) return null;
-                          return <span key={p} style={{fontSize:10,color:"#9ca3af",background:"#1f2937",borderRadius:4,padding:"1px 6px"}}><strong style={{color:"#c9a84c"}}>{p}:</strong> {pp}</span>;
+                          return <span key={p} style={{fontSize:10,color:"#9ca3af",background:"#1f2937",borderRadius:4,padding:"1px 6px"}}><strong style={{color:"#E61D25"}}>{p}:</strong> {pp}</span>;
                         })}
                       </div>
                       <PredictorInput q={q} value={correctAnswer}
@@ -1207,7 +1235,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
                         placeholder="Set correct answer…"/>
                     </div>
                   )}
-                  {hasAnswer&&<div style={{fontSize:10,color:"#6b7280",marginTop:2}}>✓ Answer: <strong style={{color:"#c9a84c"}}>{correctAnswer}</strong></div>}
+                  {hasAnswer&&<div style={{fontSize:10,color:"#6b7280",marginTop:2}}>✓ Answer: <strong style={{color:"#a8e031",fontWeight:600}}>{correctAnswer}</strong></div>}
                 </div>
               </div>
             );
@@ -1225,7 +1253,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
           <span style={S.lbRank}>{i+1}</span>
           <span style={S.lbName}>{p}</span>
           <span style={{fontSize:11,color:"#6b7280"}}>{scores[p]}/{maxPts} pts</span>
-          <div style={{marginLeft:"auto",background:"rgba(201,168,76,0.1)",borderRadius:20,padding:"2px 10px",fontSize:11,color:"#c9a84c",fontWeight:700}}>
+          <div style={{marginLeft:"auto",background:"#E61D25",borderRadius:2,padding:"3px 10px",fontSize:11,color:"#fff",fontWeight:400,letterSpacing:1,fontFamily:"'Bebas Neue',sans-serif",fontWeight:700}}>
             {scores[p]}
           </div>
         </div>
@@ -1267,7 +1295,7 @@ function PredictorInput({ q, value, onChange, placeholder }) {
           <option value="">-</option>
           {opts.map(n=><option key={n} value={n}>{n}</option>)}
         </select>
-        <span style={{color:"#c9a84c",fontWeight:700,fontSize:16}}>–</span>
+        <span style={{color:"#E61D25",fontWeight:700,fontSize:16}}>–</span>
         <select style={selectStyle} value={away}
           onChange={e=>handleChange(home, e.target.value)}>
           <option value="">-</option>
@@ -1380,89 +1408,128 @@ function SettingsTab({ state, update, newPlayerName, setNewPlayerName, addPlayer
 // STYLES
 // ═══════════════════════════════════════════════════════════════════════════════
 const S = {
-  root:{minHeight:"100vh",background:"#0a0a0f",backgroundImage:"radial-gradient(ellipse at top,#1a1a2e 0%,#0a0a0f 60%)",color:"#ddd",fontFamily:"'Barlow Condensed','Oswald',sans-serif"},
-  loadScreen:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0a0a0f"},
-  spinner:{width:40,height:40,border:"3px solid #333",borderTop:"3px solid #c9a84c",borderRadius:"50%"},
-  header:{background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)",borderBottom:"2px solid #c9a84c",position:"sticky",top:0,zIndex:100},
-  headerInner:{display:"flex",alignItems:"center",gap:10,padding:"10px 14px"},
-  trophy:{fontSize:28},
-  title:{margin:0,fontSize:17,fontWeight:800,letterSpacing:3,color:"#fff",fontFamily:"'Oswald',sans-serif",lineHeight:1.1},
-  subtitle:{margin:"2px 0 0",fontSize:10,color:"#999",fontFamily:"sans-serif"},
-  aliveCount:{marginLeft:"auto",textAlign:"center",background:"#c9a84c",color:"#0a0a0f",borderRadius:8,padding:"3px 10px",minWidth:46,flexShrink:0},
-  aliveNum:{display:"block",fontSize:20,fontWeight:900,lineHeight:1},
-  aliveLabel:{fontSize:8,fontWeight:700,letterSpacing:2},
-  gameTabs:{display:"flex",overflowX:"auto",padding:"4px 8px",gap:5,borderBottom:"1px solid #1f2937"},
-  gameTab:{background:"transparent",border:"1px solid #374151",color:"#888",borderRadius:5,padding:"3px 9px",cursor:"pointer",fontSize:10,fontFamily:"'Oswald',sans-serif",whiteSpace:"nowrap"},
-  gameTabActive:{background:"rgba(201,168,76,0.15)",border:"1px solid #c9a84c",color:"#c9a84c"},
-  nav:{display:"flex",borderTop:"1px solid #222"},
-  navBtn:{flex:1,padding:"8px 0",background:"transparent",border:"none",color:"#888",fontFamily:"'Oswald',sans-serif",fontSize:10,letterSpacing:1,cursor:"pointer"},
-  navBtnActive:{color:"#c9a84c",borderBottom:"2px solid #c9a84c",background:"rgba(201,168,76,0.08)"},
-  main:{padding:"10px",maxWidth:900,margin:"0 auto"},
-  winnerBanner:{display:"flex",alignItems:"center",gap:14,background:"linear-gradient(135deg,#1a1a00,#2a1e00)",border:"2px solid #c9a84c",borderRadius:12,padding:"14px",marginBottom:12},
-  rolloverBanner:{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:12,color:"#f59e0b"},
-  roundCard:{background:"#111827",border:"1px solid #1f2937",borderRadius:12,marginBottom:10,overflow:"hidden"},
-  roundCardResolved:{opacity:0.72},
-  roundHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"10px 12px",borderBottom:"1px solid #1f2937",background:"linear-gradient(90deg,#111827,#0f172a)",cursor:"pointer",gap:8},
-  roundStage:{fontSize:8,color:"#c9a84c",letterSpacing:3,display:"block",marginBottom:1},
-  roundLabel:{margin:0,fontSize:14,fontWeight:700,color:"#fff",letterSpacing:1},
-  roundDeadline:{fontSize:10,color:"#888",marginTop:2,display:"block"},
-  resolvedBadge:{background:"rgba(76,175,80,0.15)",color:"#4caf50",border:"1px solid rgba(76,175,80,0.3)",borderRadius:4,padding:"2px 6px",fontSize:9,fontWeight:700,flexShrink:0},
-  expandChevron:{color:"#6b7280",fontSize:11,flexShrink:0},
-  roundNote:{padding:"6px 12px",background:"#0d1117",fontSize:11,color:"#6b7280",fontStyle:"italic",borderBottom:"1px solid #1f2937"},
-  editBtn:{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontSize:9,letterSpacing:1,fontFamily:"'Oswald',sans-serif"},
-  closeRoundBtn:{background:"rgba(229,57,53,0.12)",border:"1px solid rgba(229,57,53,0.4)",color:"#e53935",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,letterSpacing:1,fontFamily:"'Oswald',sans-serif",fontWeight:700},
-  picksGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:1,background:"#1f2937"},
-  pickCell:{background:"#111827",padding:"8px 10px"},
-  pickCellWin:{background:"#071a0e",borderLeft:"3px solid #4caf50"},
-  pickCellElim:{background:"#1a0808",borderLeft:"3px solid #e53935"},
-  pickCellGhost:{opacity:0.3,background:"#0d1117"},
-  pickCellSatOut:{opacity:0.35,background:"#0a0f0a"},
-  pickPlayer:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4},
-  pickPlayerName:{fontSize:11,fontWeight:700,color:"#e5e7eb",letterSpacing:1},
-  elimBadge:{fontSize:8,background:"#7f1d1d",color:"#fca5a5",borderRadius:3,padding:"1px 3px"},
-  pickSelect:{width:"100%",background:"#1f2937",border:"1px solid #374151",color:"#ddd",borderRadius:4,padding:"3px 4px",fontSize:10,outline:"none",marginBottom:3},
-  pickDisplay:{fontSize:11,color:"#d1d5db",marginBottom:3,minHeight:16},
-  outcomeRow:{display:"flex",gap:3},
-  outcomeBtn:{flex:1,padding:"3px 0",background:"transparent",border:"1px solid #374151",borderRadius:4,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Oswald',sans-serif",letterSpacing:1,transition:"all 0.12s"},
-  resultBar:{padding:"6px 12px",background:"rgba(201,168,76,0.07)",borderTop:"1px solid rgba(201,168,76,0.15)",color:"#c9a84c",fontSize:10,letterSpacing:1},
-  fixtureSection:{background:"#111827",border:"1px solid #1f2937",borderRadius:10,marginBottom:8,overflow:"hidden"},
-  fixtureSectionHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"10px 12px",cursor:"pointer",gap:8,background:"linear-gradient(90deg,#111827,#0f172a)"},
-  fixtureSectionTitle:{fontSize:13,fontWeight:700,color:"#fff",letterSpacing:1,display:"block",marginTop:1},
-  fixtureNote:{padding:"6px 12px",background:"#0d1117",fontSize:11,color:"#6b7280",fontStyle:"italic",borderBottom:"1px solid #1f2937"},
-  deadlineBadge:{background:"rgba(201,168,76,0.12)",color:"#c9a84c",border:"1px solid rgba(201,168,76,0.25)",borderRadius:4,padding:"2px 6px",fontSize:9,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"},
-  fixtureRow:{display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderBottom:"1px solid #0d1117"},
-  fixtureDate:{fontSize:9,color:"#6b7280",minWidth:72,flexShrink:0,fontFamily:"sans-serif"},
-  fixtureTeam:{fontSize:11,color:"#d1d5db",flex:1,minWidth:0},
-  fixtureVs:{fontSize:10,color:"#374151",flexShrink:0,padding:"0 2px"},
-  // Money
-  sectionTitle:{fontSize:16,letterSpacing:4,color:"#c9a84c",marginBottom:10,fontFamily:"'Oswald',sans-serif",borderBottom:"1px solid #1f2937",paddingBottom:7},
-  moneyRow:{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:10,marginBottom:5},
-  moneyRowUp:{background:"#071a0e",border:"1px solid rgba(76,175,80,0.25)"},
-  moneyRowEven:{background:"#111827",border:"1px solid #1f2937"},
-  moneyRowDown:{background:"#150808",border:"1px solid rgba(229,57,53,0.2)"},
-  moneyRank:{width:20,fontSize:14,fontWeight:900,color:"#374151",textAlign:"center",flexShrink:0},
-  moneyName:{fontSize:14,fontWeight:700,color:"#e5e7eb",marginBottom:3},
-  moneyBreakdown:{fontSize:10,color:"#6b7280",lineHeight:1.4},
-  moneyNet:{fontSize:22,fontWeight:900,fontFamily:"'Oswald',sans-serif",flexShrink:0,minWidth:52,textAlign:"right"},
-  moneyGameBlock:{background:"#111827",border:"1px solid #1f2937",borderRadius:10,marginBottom:8,overflow:"hidden"},
-  moneyGameHeader:{padding:"10px 12px",borderBottom:"1px solid #1f2937",display:"flex",flexDirection:"column",gap:3},
-  // Rules
+  root:{minHeight:"100vh",background:"#0e0f14",color:"#fff",fontFamily:"'DM Sans','Helvetica Neue',sans-serif"},
+  loadScreen:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0e0f14"},
+  spinner:{width:36,height:36,border:"2px solid #1e1f26",borderTop:"2px solid #E61D25",borderRadius:"50%"},
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  header:{background:"#0e0f14",position:"sticky",top:0,zIndex:100,borderBottom:"3px solid #E61D25"},
+  headerTop:{display:"flex",alignItems:"center",gap:14,padding:"18px 18px 14px"},
+  kicker:{fontSize:9,letterSpacing:4,color:"#E61D25",fontWeight:700,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",marginBottom:6},
+  title:{margin:0,fontSize:42,fontWeight:400,letterSpacing:1,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",lineHeight:0.88,textTransform:"uppercase"},
+  aliveCount:{marginLeft:"auto",textAlign:"center",background:"#E61D25",color:"#fff",borderRadius:4,padding:"10px 16px",minWidth:64,flexShrink:0,alignSelf:"flex-start"},
+  aliveNum:{display:"block",fontSize:38,fontWeight:400,lineHeight:0.9,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1},
+  aliveLabel:{fontSize:8,fontWeight:700,letterSpacing:3,textTransform:"uppercase",opacity:0.9},
+  statStrip:{display:"flex",alignItems:"center",padding:"0 18px 14px",gap:0},
+  statItem:{display:"flex",flexDirection:"column",gap:2,flex:1},
+  statLabel:{fontSize:8,letterSpacing:2,color:"#444",textTransform:"uppercase",fontWeight:600},
+  statValue:{fontSize:18,fontFamily:"'Bebas Neue',sans-serif",color:"#fff",letterSpacing:1,lineHeight:1},
+  statDivider:{width:1,height:28,background:"#1c1c1c",margin:"0 16px"},
+
+  // ── Game tabs ─────────────────────────────────────────────────────────────
+  gameTabs:{display:"flex",overflowX:"auto",padding:"0 16px",gap:0,background:"#0e0f14",borderBottom:"1px solid #141414"},
+  gameTab:{background:"transparent",border:"none",borderBottom:"2px solid transparent",color:"#3a3b45",padding:"9px 12px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap",fontWeight:600,letterSpacing:1.5,textTransform:"uppercase"},
+  gameTabActive:{color:"#E61D25",borderBottom:"2px solid #E61D25"},
+
+  // ── Nav ───────────────────────────────────────────────────────────────────
+  nav:{display:"flex",background:"#0b0c10",borderBottom:"1px solid #141414"},
+  navBtn:{flex:1,padding:"11px 0",background:"transparent",border:"none",color:"#333",fontFamily:"'DM Sans',sans-serif",fontSize:9,letterSpacing:2.5,cursor:"pointer",textTransform:"uppercase",fontWeight:700,borderBottom:"3px solid transparent"},
+  navBtnActive:{color:"#fff",borderBottom:"3px solid #E61D25",background:"#0d0d0d"},
+
+  main:{padding:"14px 14px",maxWidth:900,margin:"0 auto"},
+
+  // ── Banners ───────────────────────────────────────────────────────────────
+  winnerBanner:{display:"flex",alignItems:"center",gap:18,background:"#E61D25",padding:"18px 20px",marginBottom:14,borderRadius:3},
+  rolloverBanner:{background:"#13141a",borderLeft:"3px solid #a8e031",padding:"10px 14px",marginBottom:10,fontSize:10,color:"#a8e031",letterSpacing:2,textTransform:"uppercase",fontWeight:700},
+
+  // ── Round cards ───────────────────────────────────────────────────────────
+  roundCard:{background:"#13141a",borderRadius:3,marginBottom:10,overflow:"hidden",border:"1px solid #1e1f26"},
+  roundCardResolved:{opacity:0.45},
+  roundHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid #1e1f26",cursor:"pointer",gap:8},
+  roundStage:{fontSize:8,color:"#E61D25",letterSpacing:4,display:"block",marginBottom:5,textTransform:"uppercase",fontWeight:700},
+  roundLabel:{margin:0,fontSize:22,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2},
+  roundDeadline:{fontSize:10,color:"#666",marginTop:4,display:"block",letterSpacing:0.5},
+  resolvedBadge:{background:"#a8e031",color:"#080808",borderRadius:2,padding:"3px 10px",fontSize:8,fontWeight:700,flexShrink:0,textTransform:"uppercase",letterSpacing:2,alignSelf:"flex-start"},
+  expandChevron:{color:"#2e2f38",fontSize:10,flexShrink:0,marginTop:6},
+  roundNote:{padding:"10px 16px",background:"#0b0c10",fontSize:11,color:"#777",borderBottom:"1px solid #1e1f26",lineHeight:1.5},
+  editBtn:{background:"transparent",border:"1px solid #1e1f26",color:"#3a3b45",borderRadius:2,padding:"4px 12px",cursor:"pointer",fontSize:8,letterSpacing:2.5,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
+  closeRoundBtn:{background:"transparent",border:"1px solid #E61D25",color:"#E61D25",borderRadius:2,padding:"4px 12px",cursor:"pointer",fontSize:8,letterSpacing:2,fontFamily:"'DM Sans',sans-serif",fontWeight:700,textTransform:"uppercase"},
+
+  // ── Pick grid ─────────────────────────────────────────────────────────────
+  picksGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:1,background:"#1e1f26"},
+  pickCell:{background:"#13141a",padding:"12px 14px"},
+  pickCellWin:{background:"#0a1a0a",borderLeft:"3px solid #a8e031"},
+  pickCellElim:{background:"#1a0a0a",borderLeft:"3px solid #E61D25"},
+  pickCellGhost:{opacity:0.15,background:"#0e0f14"},
+  pickCellSatOut:{opacity:0.2,background:"#0b0c10"},
+  pickPlayer:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7},
+  pickPlayerName:{fontSize:11,fontWeight:700,color:"#fff",letterSpacing:1,textTransform:"uppercase"},
+  elimBadge:{fontSize:7,background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 5px",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"},
+  pickSelect:{width:"100%",background:"#1a1b22",border:"1px solid #1e1f26",color:"#ccc",borderRadius:2,padding:"5px 7px",fontSize:11,outline:"none",marginBottom:4},
+  pickDisplay:{fontSize:12,color:"#777",marginBottom:4,minHeight:20},
+  outcomeRow:{display:"flex",gap:4,marginTop:2},
+  outcomeBtn:{flex:1,padding:"5px 0",background:"transparent",border:"1px solid #1e1f26",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.5,transition:"all 0.1s",fontFamily:"'DM Sans',sans-serif"},
+  resultBar:{padding:"9px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26",color:"#a8e031",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontWeight:700},
+
+  // ── Fixtures ──────────────────────────────────────────────────────────────
+  fixtureSection:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,marginBottom:10,overflow:"hidden"},
+  fixtureSectionHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"13px 16px",cursor:"pointer",gap:8,borderBottom:"1px solid #1e1f26"},
+  fixtureSectionTitle:{fontSize:18,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},
+  fixtureNote:{padding:"10px 16px",background:"#0b0c10",fontSize:11,color:"#777",borderBottom:"1px solid #1e1f26",lineHeight:1.6},
+  deadlineBadge:{background:"transparent",color:"#E61D25",border:"1px solid #E61D25",borderRadius:2,padding:"3px 9px",fontSize:8,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",letterSpacing:1.5,textTransform:"uppercase"},
+  fixtureRow:{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"1px solid #111318"},
+  fixtureDate:{fontSize:10,color:"#666",minWidth:85,flexShrink:0,letterSpacing:0.3},
+  fixtureTeam:{fontSize:13,color:"#ccc",flex:1,minWidth:0},
+  fixtureVs:{fontSize:9,color:"#1c1c1c",flexShrink:0,padding:"0 4px",fontWeight:700,letterSpacing:2},
+
+  // ── Section titles ────────────────────────────────────────────────────────
+  sectionTitle:{fontSize:26,fontWeight:400,color:"#fff",marginBottom:14,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,textTransform:"uppercase",display:"block",borderBottom:"1px solid #1e1f26",paddingBottom:10},
+
+  // ── Money tracker ─────────────────────────────────────────────────────────
+  moneyRow:{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",marginBottom:1,background:"#13141a",borderBottom:"1px solid #1a1b22"},
+  moneyRowUp:{borderLeft:"3px solid #a8e031"},
+  moneyRowEven:{borderLeft:"3px solid #1e1f26"},
+  moneyRowDown:{borderLeft:"3px solid #E61D25"},
+  moneyRank:{width:26,fontSize:14,fontWeight:400,color:"#222",textAlign:"center",flexShrink:0,fontFamily:"'Bebas Neue',sans-serif"},
+  moneyName:{fontSize:14,fontWeight:700,color:"#fff",marginBottom:3},
+  moneyBreakdown:{fontSize:10,color:"#333",lineHeight:1.5},
+  moneyNet:{fontSize:26,fontWeight:400,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,flexShrink:0,minWidth:60,textAlign:"right"},
+  moneyGameBlock:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,marginBottom:8,overflow:"hidden"},
+  moneyGameHeader:{padding:"12px 16px",borderBottom:"1px solid #1e1f26",display:"flex",flexDirection:"column",gap:4},
+
+  // ── Rules ─────────────────────────────────────────────────────────────────
   rules:{},
-  ruleRow:{display:"flex",gap:10,padding:"9px 0",borderBottom:"1px solid #1a1a1a",alignItems:"flex-start"},
-  ruleNum:{width:22,height:22,background:"#c9a84c",color:"#0a0a0f",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:900,flexShrink:0},
-  ruleText:{fontSize:12,color:"#d1d5db",lineHeight:1.5,paddingTop:1},
-  // Settings
+  ruleRow:{display:"flex",gap:14,padding:"12px 0",borderBottom:"1px solid #1a1b22",alignItems:"flex-start"},
+  ruleNum:{width:24,height:24,background:"#E61D25",color:"#fff",borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0},
+  ruleText:{fontSize:12,color:"#666",lineHeight:1.7},
+
+  // ── Settings ──────────────────────────────────────────────────────────────
   settings:{},
-  infoBox:{background:"rgba(201,168,76,0.07)",border:"1px solid rgba(201,168,76,0.25)",borderRadius:8,padding:"12px",marginBottom:12},
-  settingGroup:{background:"#111827",border:"1px solid #1f2937",borderRadius:10,padding:"12px",marginBottom:10},
-  settingGroupTitle:{fontSize:11,letterSpacing:2,color:"#c9a84c",margin:"0 0 9px",fontFamily:"'Oswald',sans-serif"},
-  playerRow:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #1a1a1a"},
-  editInput:{background:"#1f2937",border:"1px solid #374151",color:"#ddd",borderRadius:5,padding:"5px 8px",fontSize:12,outline:"none",flex:1},
-  addBtn:{background:"#c9a84c",color:"#0a0a0f",border:"none",borderRadius:5,padding:"5px 12px",cursor:"pointer",fontWeight:700,letterSpacing:1,fontFamily:"'Oswald',sans-serif"},
-  removeBtn:{background:"transparent",border:"1px solid #7f1d1d",color:"#e53935",borderRadius:4,padding:"3px 6px",cursor:"pointer",fontSize:11},
-  predHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:12},
-  predCatHeader:{fontSize:13,letterSpacing:3,color:"#c9a84c",padding:"8px 0 6px",borderBottom:"1px solid #1f2937",marginBottom:8,fontFamily:"'Oswald',sans-serif"},
-  predRow:{background:"#111827",border:"1px solid #1f2937",borderRadius:8,padding:"10px 12px",marginBottom:6},
-  predPtsBadge:{background:"rgba(201,168,76,0.15)",color:"#c9a84c",border:"1px solid rgba(201,168,76,0.3)",borderRadius:4,padding:"1px 6px",fontSize:9,fontWeight:700,flexShrink:0},
-  toast:{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",background:"#c9a84c",color:"#0a0a0f",padding:"8px 20px",borderRadius:20,fontWeight:700,letterSpacing:1,fontSize:12,zIndex:999,boxShadow:"0 4px 20px rgba(201,168,76,0.4)",whiteSpace:"nowrap"},
+  infoBox:{background:"#13141a",borderLeft:"3px solid #E61D25",padding:"14px 16px",marginBottom:14},
+  settingGroup:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,padding:"16px",marginBottom:10},
+  settingGroupTitle:{fontSize:8,letterSpacing:4,color:"#E61D25",margin:"0 0 12px",fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
+  playerRow:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1a1b22"},
+  editInput:{background:"#1a1b22",border:"1px solid #1e1f26",color:"#fff",borderRadius:2,padding:"8px 12px",fontSize:13,outline:"none",flex:1,fontFamily:"'DM Sans',sans-serif"},
+  addBtn:{background:"#E61D25",color:"#fff",border:"none",borderRadius:2,padding:"8px 18px",cursor:"pointer",fontWeight:700,letterSpacing:2,fontFamily:"'DM Sans',sans-serif",fontSize:10,textTransform:"uppercase"},
+  removeBtn:{background:"transparent",border:"1px solid #1e1f26",color:"#3a3b45",borderRadius:2,padding:"5px 10px",cursor:"pointer",fontSize:11},
+
+  // ── Predictor ─────────────────────────────────────────────────────────────
+  predHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:16},
+  predCatHeader:{fontSize:8,letterSpacing:4,color:"#3a3b45",padding:"14px 0 8px",borderBottom:"1px solid #1e1f26",marginBottom:10,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
+  predRow:{background:"#13141a",borderBottom:"1px solid #1a1b22",padding:"14px 0",marginBottom:0},
+  predPtsBadge:{background:"#E61D25",color:"#fff",borderRadius:2,padding:"3px 8px",fontSize:8,fontWeight:700,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
+
+  // ── Leaderboard ───────────────────────────────────────────────────────────
+  lbRow:{display:"flex",alignItems:"center",gap:12,padding:"14px 0",borderBottom:"1px solid #1a1b22"},
+  lbRowWinner:{borderLeft:"3px solid #a8e031",paddingLeft:12},
+  lbRowAlive:{},
+  lbRowElim:{opacity:0.3},
+  lbRank:{width:28,fontSize:16,fontWeight:400,color:"#222",textAlign:"center",fontFamily:"'Bebas Neue',sans-serif"},
+  lbName:{flex:1,fontSize:15,fontWeight:700,color:"#fff"},
+  lbStatus:{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",fontWeight:600},
+  lbStat:{fontSize:10,color:"#333",minWidth:48,textAlign:"right"},
+  lbPot:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:18,padding:"16px 18px",background:"#E61D25",borderRadius:3},
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  toast:{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#fff",color:"#080808",padding:"10px 24px",borderRadius:2,fontWeight:700,letterSpacing:3,fontSize:10,zIndex:999,boxShadow:"0 8px 40px rgba(0,0,0,0.7)",whiteSpace:"nowrap",textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
 };
