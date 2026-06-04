@@ -257,7 +257,8 @@ function defaultState() {
     predictor: {
       picks: {},    // picks[player][questionId] = answer
       answers: {},  // answers[questionId] = correct answer (admin sets)
-      locked: false, // once locked, no more picks
+      overrides: {}, // overrides[questionId][player] = true/false (admin manual tick for freetext)
+      locked: false,
     },
     lastUpdated:0,
   };
@@ -462,6 +463,11 @@ function computeMoneyTracker(state) {
         if (pick && sfAnswers.includes(pick)) scores[p] += q.pts;
         continue;
       }
+      if (q.type === "freetext") {
+        const overrideVal = (pred.overrides||{})[q.id]?.[p];
+        if (overrideVal === true) { scores[p] += q.pts; continue; }
+        if (overrideVal === false) continue;
+      }
       const ans = pred.answers[q.id];
       if (ans && picks[q.id] && ans.toLowerCase().trim() === picks[q.id].toLowerCase().trim()) {
         scores[p] += q.pts;
@@ -640,8 +646,15 @@ export default function App() {
   });
 
   const setPredictorAnswer = (questionId, answer) => update(s => {
-    if (!s.predictor) s.predictor = { picks:{}, answers:{}, locked:false };
+    if (!s.predictor) s.predictor = { picks:{}, answers:{}, overrides:{}, locked:false };
     s.predictor.answers[questionId] = answer;
+  });
+
+  const setPredictorOverride = (questionId, player, value) => update(s => {
+    if (!s.predictor) s.predictor = { picks:{}, answers:{}, overrides:{}, locked:false };
+    if (!s.predictor.overrides) s.predictor.overrides = {};
+    if (!s.predictor.overrides[questionId]) s.predictor.overrides[questionId] = {};
+    s.predictor.overrides[questionId][player] = value;
   });
 
   const togglePredictorLock = () => update(s => {
@@ -771,6 +784,7 @@ export default function App() {
             state={state}
             setPredictorPick={setPredictorPick}
             setPredictorAnswer={setPredictorAnswer}
+            setPredictorOverride={setPredictorOverride}
             togglePredictorLock={togglePredictorLock}
           />
         )}
@@ -1186,7 +1200,7 @@ function MoneyTab({ state }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREDICTOR TAB
 // ═══════════════════════════════════════════════════════════════════════════════
-function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredictorLock }) {
+function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredictorOverride, togglePredictorLock }) {
   const pred = state.predictor || { picks:{}, answers:{}, locked:false };
   const [adminMode, setAdminMode] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(state.players[0]);
@@ -1211,6 +1225,13 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
         const pick = (picks[q.id]||"").toLowerCase().trim();
         if (pick && sfAnswers.includes(pick)) scores[p] += q.pts;
         continue;
+      }
+      // For freetext questions, check manual override first
+      if (q.type === "freetext") {
+        const overrideVal = (pred.overrides||{})[q.id]?.[p];
+        if (overrideVal === true) { scores[p] += q.pts; continue; }
+        if (overrideVal === false) continue; // explicitly marked wrong
+        // Fall through to text match if no override set
       }
       const ans = pred.answers[q.id];
       if (ans && picks[q.id] && ans.toLowerCase().trim() === picks[q.id].toLowerCase().trim()) {
@@ -1274,10 +1295,13 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
           {PREDICTOR_QUESTIONS.filter(q=>q.cat===cat).map(q=>{
             const playerPick = (pred.picks[selectedPlayer]||{})[q.id] || "";
             const correctAnswer = pred.answers[q.id] || "";
+            const overrideVal = (pred.overrides||{})[q.id]?.[selectedPlayer];
             const isCorrect = q.id === "semi1" || q.id === "semi2" || q.id === "semi3" || q.id === "semi4"
               ? sfAnswers.length > 0 && playerPick && sfAnswers.includes(playerPick.toLowerCase().trim())
-              : correctAnswer && playerPick && correctAnswer.toLowerCase().trim()===playerPick.toLowerCase().trim();
-            const hasAnswer = !!correctAnswer;
+              : q.type === "freetext" && overrideVal !== undefined
+                ? overrideVal === true
+                : correctAnswer && playerPick && correctAnswer.toLowerCase().trim()===playerPick.toLowerCase().trim();
+            const hasAnswer = !!correctAnswer || (q.type==="freetext" && overrideVal !== undefined);
 
             return (
               <div key={q.id} style={{
@@ -1307,13 +1331,35 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, togglePredi
                   {/* Admin: show all players' picks + set correct answer */}
                   {adminMode&&(
                     <div style={{marginTop:4}}>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
-                        {state.players.map(p=>{
-                          const pp = (pred.picks[p]||{})[q.id];
-                          if (!pp) return null;
-                          return <span key={p} style={{fontSize:10,color:"#9ca3af",background:"#1f2937",borderRadius:4,padding:"1px 6px"}}><strong style={{color:"#E61D25"}}>{p}:</strong> {pp}</span>;
-                        })}
-                      </div>
+                      {q.type==="freetext" ? (
+                        // Freetext: show each player's answer with tick/cross override
+                        <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:6}}>
+                          {state.players.map(p=>{
+                            const pp = (pred.picks[p]||{})[q.id];
+                            if (!pp) return null;
+                            const ov = (pred.overrides||{})[q.id]?.[p];
+                            return (
+                              <div key={p} style={{display:"flex",alignItems:"center",gap:8,background:"#1a1b22",borderRadius:3,padding:"5px 10px"}}>
+                                <span style={{fontSize:11,color:"#E61D25",fontWeight:700,minWidth:60}}>{p}</span>
+                                <span style={{fontSize:11,color:"#ccc",flex:1}}>{pp}</span>
+                                <button onClick={()=>setPredictorOverride(q.id,p,ov===true?null:true)}
+                                  style={{background:ov===true?"#a8e031":"transparent",border:"1px solid",borderColor:ov===true?"#a8e031":"#333",color:ov===true?"#080808":"#444",borderRadius:2,padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:700}}>✓</button>
+                                <button onClick={()=>setPredictorOverride(q.id,p,ov===false?null:false)}
+                                  style={{background:ov===false?"#E61D25":"transparent",border:"1px solid",borderColor:ov===false?"#E61D25":"#333",color:ov===false?"#fff":"#444",borderRadius:2,padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:700}}>✗</button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        // Non-freetext: show picks summary
+                        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+                          {state.players.map(p=>{
+                            const pp = (pred.picks[p]||{})[q.id];
+                            if (!pp) return null;
+                            return <span key={p} style={{fontSize:10,color:"#9ca3af",background:"#1a1b22",borderRadius:4,padding:"1px 6px"}}><strong style={{color:"#E61D25"}}>{p}:</strong> {pp}</span>;
+                          })}
+                        </div>
+                      )}
                       <PredictorInput q={q} value={correctAnswer}
                         onChange={v=>setPredictorAnswer(q.id, v)}
                         placeholder="Set correct answer…"/>
