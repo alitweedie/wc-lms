@@ -213,12 +213,12 @@ const PREDICTOR_FEE = 10; // £10 per person for the predictor game
 // All 48 WC 2026 teams for dropdowns
 const ALL_NATIONS = [
   "Algeria","Argentina","Australia","Austria","Belgium","Bosnia & Herz.",
-  "Brazil","Canada","Cape Verde","Colombia","Costa Rica","Croatia","Curaçao",
+  "Brazil","Canada","Cape Verde","Colombia","Croatia","Curaçao",
   "Czechia","DR Congo","Ecuador","Egypt","England","France","Germany","Ghana",
   "Haiti","Iran","Iraq","Ivory Coast","Japan","Jordan","Mexico","Morocco",
   "Netherlands","New Zealand","Norway","Panama","Paraguay","Portugal","Qatar",
   "Saudi Arabia","Scotland","Senegal","South Africa","South Korea","Spain",
-  "Sweden","Switzerland","Tunisia","Turkey","Uruguay","USA","Uzbekistan","Wales",
+  "Sweden","Switzerland","Tunisia","Turkey","Uruguay","USA","Uzbekistan",
 ].sort();
 
 const PREDICTOR_QUESTIONS = [
@@ -413,11 +413,13 @@ function evaluateGameEnd(g, players) {
   const roundEliminated = entrants.filter(p =>
     lastRound.outcomes[p] === OUTCOME.LOSE || lastRound.outcomes[p] === OUTCOME.DRAW
   ).length;
-  const roundPending = entrants.filter(p =>
+  // Only check pending for players who were alive at the start of the last settled round
+  const aliveAtLastRound = getAliveAtStart(g, players, lastSettledIdx);
+  const roundPending = aliveAtLastRound.filter(p =>
     !lastRound.outcomes[p] || lastRound.outcomes[p] === OUTCOME.PENDING
   ).length;
 
-  // Don't end the game if any entrant still has a pending outcome in this round
+  // Don't end the game if any alive player still has a pending outcome in this round
   if (roundPending > 0) return;
 
   const gameOver = roundSurvivors <= 1 || isFinalRound;
