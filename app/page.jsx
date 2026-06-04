@@ -173,6 +173,36 @@ const ROUNDS = [
 ];
 
 const isPlaceholder = t => !t || t.includes("Winner") || t.includes("TBD") || t.includes("Runner") || t.includes("R32") || t.includes("R16") || t.includes("QF") || t.includes("SF");
+
+// Parse a date+time string from fixtures e.g. "Thu 11 Jun" + "20:00 BST"
+// BST = UTC+1, so subtract 1 hour to get UTC
+const MONTH_MAP = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+function parseKickoff(dateStr, timeStr) {
+  try {
+    const dm = dateStr.match(/(\d+)\s+(\w+)/);
+    const tm = timeStr.match(/(\d+):(\d+)/);
+    if (!dm || !tm) return null;
+    const [,day,mon] = dm;
+    const [,hh,mm] = tm;
+    const month = MONTH_MAP[mon];
+    if (month === undefined) return null;
+    // BST = UTC+1, subtract 1hr for UTC
+    return new Date(Date.UTC(2026, month, parseInt(day), parseInt(hh) - 1, parseInt(mm)));
+  } catch { return null; }
+}
+
+// Lock time = kick-off of the first fixture in the round
+function getRoundLockTime(wcRound) {
+  if (!wcRound || !wcRound.fixtures || wcRound.fixtures.length === 0) return null;
+  const [,, date, time] = wcRound.fixtures[0];
+  return parseKickoff(date, time);
+}
+
+function isRoundLocked(wcRound) {
+  const lockTime = getRoundLockTime(wcRound);
+  if (!lockTime) return false;
+  return Date.now() > lockTime.getTime();
+}
 const realTeams = r => [...new Set(r.fixtures.flatMap(([h,a])=>[h,a]).filter(t=>!isPlaceholder(t)))].sort();
 
 const OUTCOME = { WIN:"win", LOSE:"lose", DRAW:"draw", PENDING:"" };
@@ -902,18 +932,22 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
   });
   const canClose = !resolved && unpickedAlive.length > 0;
 
+  const deadlinePassed = wcRound ? isRoundLocked(wcRound) : false;
+
   return (
     <div style={{...S.roundCard,...(resolved?S.roundCardResolved:{})}}>
       <div style={S.roundHeader} onClick={()=>setExpanded(e=>!e)}>
         <div style={{flex:1,minWidth:0}}>
           <span style={S.roundStage}>{round.stage}</span>
           <h2 style={S.roundLabel}>{round.label}</h2>
-          {wcRound&&<span style={S.roundDeadline}>⏰ Deadline: {wcRound.deadline}</span>}
+          {wcRound&&(()=>{ const lt=getRoundLockTime(wcRound); return <span style={S.roundDeadline}>🔒 Locks at first KO: {wcRound.fixtures[0]?.[2]} {wcRound.fixtures[0]?.[3]}</span>; })()}
         </div>
         <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
           {resolved
             ?<span style={S.resolvedBadge}>✓ {survivors.length} survive</span>
-            :<span style={S.expandChevron}>{expanded?"▲":"▼"}</span>}
+            :deadlinePassed
+              ?<span style={{background:"#E61D25",color:"#fff",borderRadius:2,padding:"3px 8px",fontSize:8,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"}}>⏰ LOCKED</span>
+              :<span style={S.expandChevron}>{expanded?"▲":"▼"}</span>}
         </div>
       </div>
 
@@ -969,7 +1003,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                     <div style={S.pickDisplay}><span style={{color:"#3d6b56",fontStyle:"italic"}}>sat out</span></div>
                   ):isAlive?(
                     <>
-                      {!resolved?(
+                      {!resolved&&!deadlinePassed?(
                         <select style={S.pickSelect} value={pick||""}
                           onChange={e=>setPick(gi,round.id,player,e.target.value)}>
                           <option value="">{isFirstRound?"— select team to enter —":"— select team —"}</option>
@@ -979,8 +1013,17 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                           })}
                         </select>
                       ):(
-                        <div style={S.pickDisplay}>
-                          {pick?<>{FLAG[pick]||"🏳️"} <strong>{pick}</strong></>:<span style={{color:"#555",fontStyle:"italic"}}>No pick</span>}
+                        <div style={{...S.pickDisplay, ...(deadlinePassed&&!resolved?{opacity:0.7}:{})}}>
+                          {pick?(
+                            <span>
+                              {FLAG[pick]||"🏳️"} <strong>{pick}</strong>
+                              {deadlinePassed&&!resolved&&<span style={{marginLeft:6,fontSize:8,color:"#E61D25",letterSpacing:1,fontWeight:700,textTransform:"uppercase"}}>🔒 LOCKED</span>}
+                            </span>
+                          ):deadlinePassed&&!resolved?(
+                            <span style={{color:"#E61D25",fontSize:10,fontWeight:700,letterSpacing:1}}>⏰ NO PICK — DEADLINE PASSED</span>
+                          ):(
+                            <span style={{color:"#555",fontStyle:"italic"}}>No pick</span>
+                          )}
                         </div>
                       )}
                       {pick&&isEditing&&(
