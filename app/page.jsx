@@ -385,6 +385,9 @@ function evaluateGameEnd(g, players) {
   let lastSettledIdx = -1;
   for (let i = 0; i < g.rounds.length; i++) {
     const alive = getAliveAtStart(g, players, i);
+    // If nobody is alive going into this round AND no outcomes have been set,
+    // this round was never actually played — stop here.
+    if (alive.length === 0 && !roundResolved(g.rounds[i])) break;
     if (isRoundFullySettled(g.rounds[i], alive)) {
       lastSettledIdx = i;
     } else {
@@ -415,11 +418,15 @@ function evaluateGameEnd(g, players) {
   ).length;
   // Only check pending for players who were alive at the start of the last settled round
   const aliveAtLastRound = getAliveAtStart(g, players, lastSettledIdx);
-  const roundPending = aliveAtLastRound.filter(p =>
-    !lastRound.outcomes[p] || lastRound.outcomes[p] === OUTCOME.PENDING
-  ).length;
+  const roundPending = aliveAtLastRound.filter(p => {
+    const o = lastRound.outcomes[p];
+    const pick = lastRound.picks[p];
+    // No pick = auto-loss = settled. Only truly pending if they had a pick but no outcome yet.
+    if (!pick) return false;
+    return !o || o === OUTCOME.PENDING;
+  }).length;
 
-  // Don't end the game if any alive player still has a pending outcome in this round
+  // Don't end the game if any alive player with a pick still has a pending outcome
   if (roundPending > 0) return;
 
   const gameOver = roundSurvivors <= 1 || isFinalRound;
@@ -617,9 +624,12 @@ export default function App() {
     // Evaluate game end
     const newGame = evaluateGameEnd(g, s.players);
     if (newGame) {
-      newGame.id = s.games.length + 1;
-      newGame.label = `Game ${newGame.id}`;
-      s.games.push(newGame);
+      const alreadyExists = s.games.length > gi + 1;
+      if (!alreadyExists) {
+        newGame.id = s.games.length + 1;
+        newGame.label = `Game ${newGame.id}`;
+        s.games.push(newGame);
+      }
     }
   });
 
@@ -656,11 +666,29 @@ export default function App() {
     if (!r) return;
     // Toggle off if already set to same value
     r.outcomes[player] = (r.outcomes[player] === outcome) ? OUTCOME.PENDING : outcome;
+
+    // If game was previously complete, reset it — outcome change may invalidate the result
+    if (g.complete) {
+      g.complete = false;
+      g.winners = [];
+      g.rolledOver = false;
+      // Remove the auto-spawned next game if it has no picks yet
+      if (s.games.length > gi + 1) {
+        const nextGame = s.games[gi + 1];
+        const hasAnyPicks = nextGame.rounds.some(r => Object.values(r.picks).some(p => !!p));
+        if (!hasAnyPicks) s.games.splice(gi + 1, 1);
+      }
+    }
+
     const newGame = evaluateGameEnd(g, s.players);
     if (newGame) {
-      newGame.id = s.games.length + 1;
-      newGame.label = `Game ${newGame.id}`;
-      s.games.push(newGame);
+      // Only push if no next game already exists for this game
+      const alreadyExists = s.games.length > gi + 1;
+      if (!alreadyExists) {
+        newGame.id = s.games.length + 1;
+        newGame.label = `Game ${newGame.id}`;
+        s.games.push(newGame);
+      }
     }
   });
 
@@ -1581,7 +1609,7 @@ function SettingsTab({ state, update, newPlayerName, setNewPlayerName, addPlayer
     <div style={S.settings}>
       <h2 style={S.sectionTitle}>SETTINGS</h2>
       <div style={S.infoBox}>
-        <strong style={{color:"#c9a84c"}}>🌐 Live & Shared</strong>
+        <strong style={{color:"#E61D25"}}>🌐 Live & Shared</strong>
         <p style={{margin:"6px 0 0",fontSize:12,color:"#9ca3af",lineHeight:1.5}}>
           Share this artifact's URL in your WhatsApp group. All picks and results sync within ~5 seconds for everyone.
         </p>
