@@ -1112,18 +1112,25 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                       <div style={{fontSize:11,fontWeight:700,color:"#fff",letterSpacing:0.5,textTransform:"uppercase",marginBottom:5}}>{player}</div>
                       {resolved ? (
                         <div style={{fontSize:12,color:"#888"}}>{tbVal ? `Minute ${tbVal}` : <span style={{color:"#333"}}>no guess</span>}</div>
-                      ) : (
-                        <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          <input
-                            type="number" min="1" max="120"
-                            style={{...S.editInput,width:64,padding:"4px 8px",fontSize:12,flex:"none"}}
-                            placeholder="min"
-                            value={tbVal}
-                            onChange={e=>setTiebreaker(gi,round.id,player,e.target.value)}
-                          />
-                          <span style={{fontSize:10,color:"#444"}}>min</span>
-                        </div>
-                      )}
+                      ) : (()=>{
+                        const takenByOther = tbVal && Object.entries(round.tiebreaker||{}).some(([op,ov])=>op!==player&&op!=="__answer__"&&ov===tbVal);
+                        return (
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <input
+                              type="number" min="1" max="120"
+                              style={{...S.editInput,width:64,padding:"4px 8px",fontSize:12,flex:"none",borderColor:takenByOther?"#E61D25":undefined}}
+                              placeholder="min"
+                              value={tbVal}
+                              onChange={e=>{
+                                const val = e.target.value;
+                                const taken = val && Object.entries(round.tiebreaker||{}).some(([op,ov])=>op!==player&&op!=="__answer__"&&ov===val);
+                                if (!taken) setTiebreaker(gi,round.id,player,val);
+                              }}
+                            />
+                            <span style={{fontSize:10,color:takenByOther?"#E61D25":"#444"}}>{takenByOther?"TAKEN":"min"}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
