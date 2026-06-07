@@ -1112,25 +1112,13 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                       <div style={{fontSize:11,fontWeight:700,color:"#fff",letterSpacing:0.5,textTransform:"uppercase",marginBottom:5}}>{player}</div>
                       {resolved ? (
                         <div style={{fontSize:12,color:"#888"}}>{tbVal ? `Minute ${tbVal}` : <span style={{color:"#333"}}>no guess</span>}</div>
-                      ) : (()=>{
-                        const takenByOther = tbVal && Object.entries(round.tiebreaker||{}).some(([op,ov])=>op!==player&&op!=="__answer__"&&ov===tbVal);
-                        return (
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <input
-                              type="number" min="1" max="120"
-                              style={{...S.editInput,width:64,padding:"4px 8px",fontSize:12,flex:"none",borderColor:takenByOther?"#E61D25":undefined}}
-                              placeholder="min"
-                              value={tbVal}
-                              onChange={e=>{
-                                const val = e.target.value;
-                                const taken = val && Object.entries(round.tiebreaker||{}).some(([op,ov])=>op!==player&&op!=="__answer__"&&ov===val);
-                                if (!taken) setTiebreaker(gi,round.id,player,val);
-                              }}
-                            />
-                            <span style={{fontSize:10,color:takenByOther?"#E61D25":"#444"}}>{takenByOther?"TAKEN":"min"}</span>
-                          </div>
-                        );
-                      })()}
+                      ) : (
+                        <LMSTiebreakerInput
+                          value={tbVal}
+                          takenValues={Object.entries(round.tiebreaker||{}).filter(([op])=>op!==player&&op!=="__answer__").map(([,ov])=>ov).filter(Boolean)}
+                          onCommit={v=>setTiebreaker(gi,round.id,player,v)}
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -1429,8 +1417,15 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
 
                   {/* Player pick input — shown when unlocked and not in admin mode */}
                   {!adminMode&&!pred.locked&&(
-                    <PredictorInput q={q} value={playerPick}
-                      onChange={v=>setPredictorPick(selectedPlayer, q.id, v)}/>
+                    q.id==="tiebreak"
+                      ? <TiebreakerInput
+                          key={selectedPlayer}
+                          value={playerPick}
+                          takenValues={state.players.filter(p=>p!==selectedPlayer).map(p=>(pred.picks[p]||{})[q.id]).filter(Boolean)}
+                          onCommit={v=>setPredictorPick(selectedPlayer, q.id, v)}
+                        />
+                      : <PredictorInput q={q} value={playerPick}
+                          onChange={v=>setPredictorPick(selectedPlayer, q.id, v)}/>
                   )}
                   {/* Show pick when locked */}
                   {!adminMode&&pred.locked&&playerPick&&(
@@ -1501,6 +1496,53 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
       {predEntrants.length===0&&(
         <p style={{fontSize:12,color:"#6b7280",fontStyle:"italic",fontFamily:"sans-serif"}}>No entries yet — pick your player above and start predicting!</p>
       )}
+    </div>
+  );
+}
+
+function LMSTiebreakerInput({ value, takenValues, onCommit }) {
+  const [local, setLocal] = React.useState(value||"");
+  React.useEffect(()=>{ setLocal(value||""); }, [value]);
+  const isTaken = local && takenValues.includes(local) && local !== value;
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <input
+        type="number" min="1" max="120"
+        style={{...{background:"#1a1b22",border:"1px solid",color:"#fff",borderRadius:2,padding:"4px 8px",fontSize:12,outline:"none",fontFamily:"'DM Sans',sans-serif"},width:64,flex:"none",borderColor:isTaken?"#E61D25":"#1e1f26"}}
+        placeholder="min"
+        value={local}
+        onChange={e=>setLocal(e.target.value)}
+        onBlur={()=>{
+          if (!local) { onCommit(""); return; }
+          if (takenValues.includes(local)) { setLocal(value||""); return; }
+          onCommit(local);
+        }}
+      />
+      <span style={{fontSize:10,color:isTaken?"#E61D25":"#444"}}>{isTaken?"TAKEN":"min"}</span>
+    </div>
+  );
+}
+
+function TiebreakerInput({ value, takenValues, onCommit }) {
+  const [local, setLocal] = React.useState(value||"");
+  // Sync if external value changes (e.g. different player selected)
+  React.useEffect(()=>{ setLocal(value||""); }, [value]);
+  const isTaken = local && takenValues.includes(local) && local !== value;
+  return (
+    <div>
+      <input
+        type="number"
+        style={{width:"100%",background:"#1a1b22",border:"1px solid",borderColor:isTaken?"#E61D25":"#1e1f26",color:"#fff",borderRadius:2,padding:"7px 10px",fontSize:12,outline:"none",fontFamily:"'DM Sans',sans-serif",boxSizing:"border-box"}}
+        placeholder="e.g. 168"
+        value={local}
+        onChange={e=>setLocal(e.target.value)}
+        onBlur={()=>{
+          if (!local) { onCommit(""); return; }
+          if (takenValues.includes(local)) { setLocal(value||""); return; }
+          onCommit(local);
+        }}
+      />
+      {isTaken&&<div style={{fontSize:10,color:"#E61D25",fontWeight:700,marginTop:4,letterSpacing:1}}>⚠ TAKEN — PICK A DIFFERENT NUMBER</div>}
     </div>
   );
 }
