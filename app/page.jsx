@@ -1501,8 +1501,8 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
 }
 
 function LMSTiebreakerInput({ value, takenValues, onCommit }) {
-  const [local, setLocal] = React.useState(value||"");
-  React.useEffect(()=>{ setLocal(value||""); }, [value]);
+  const [local, setLocal] = useState(value||"");
+  useEffect(()=>{ setLocal(value||""); }, [value]);
   const isTaken = local && takenValues.includes(local) && local !== value;
   return (
     <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -1524,9 +1524,9 @@ function LMSTiebreakerInput({ value, takenValues, onCommit }) {
 }
 
 function TiebreakerInput({ value, takenValues, onCommit }) {
-  const [local, setLocal] = React.useState(value||"");
+  const [local, setLocal] = useState(value||"");
   // Sync if external value changes (e.g. different player selected)
-  React.useEffect(()=>{ setLocal(value||""); }, [value]);
+  useEffect(()=>{ setLocal(value||""); }, [value]);
   const isTaken = local && takenValues.includes(local) && local !== value;
   return (
     <div>
