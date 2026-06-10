@@ -1180,10 +1180,9 @@ function FixturesTab({ game }) {
             </div>
             {isOpen&&(
               <div>
-                <div style={S.fixtureNote}>{wcRound.note}</div>
                 {wcRound.fixtures.map(([home,away,date,time],i)=>(
                   <div key={i} style={S.fixtureRow}>
-                    <span style={S.fixtureDate}>{date} {time}</span>
+                    <span style={S.fixtureDate}><span style={{display:"block"}}>{date}</span><span style={{display:"block"}}>{time}</span></span>
                     <span style={S.fixtureTeam}>{FLAG[home]||"🏳️"} {home}</span>
                     <span style={S.fixtureVs}>v</span>
                     <span style={S.fixtureTeam}>{FLAG[away]||"🏳️"} {away}</span>
@@ -1754,12 +1753,12 @@ const S = {
   resultBar:{padding:"9px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26",color:"#a8e031",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontWeight:700},
 
   // ── Fixtures ──────────────────────────────────────────────────────────────
-  fixtureSection:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,marginBottom:10,overflow:"hidden"},
+  fixtureSection:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,marginBottom:10,overflow:"hidden",width:"100%"},
   fixtureSectionHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"13px 16px",cursor:"pointer",gap:8,borderBottom:"1px solid #1e1f26"},
   fixtureSectionTitle:{fontSize:18,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},
   fixtureNote:{padding:"10px 16px",background:"#0b0c10",fontSize:11,color:"#777",borderBottom:"1px solid #1e1f26",lineHeight:1.6},
-  deadlineBadge:{background:"transparent",color:"#E61D25",border:"1px solid #E61D25",borderRadius:2,padding:"3px 9px",fontSize:8,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",letterSpacing:1.5,textTransform:"uppercase"},
-  fixtureRow:{display:"grid",gridTemplateColumns:"90px 1fr 12px 1fr",alignItems:"center",gap:8,padding:"10px 16px",borderBottom:"1px solid #111318"},
+  deadlineBadge:{background:"transparent",color:"#E61D25",border:"1px solid #E61D25",borderRadius:2,padding:"3px 7px",fontSize:7,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",letterSpacing:0.5,textTransform:"uppercase"},
+  fixtureRow:{display:"grid",gridTemplateColumns:"76px 1fr 14px 1fr",alignItems:"center",gap:6,padding:"8px 14px",borderBottom:"1px solid #111318",boxSizing:"border-box",width:"100%"},
   fixtureDate:{fontSize:10,color:"#666",letterSpacing:0.3},
   fixtureTeam:{fontSize:13,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},
   fixtureVs:{fontSize:9,color:"#333",textAlign:"center",fontWeight:700,letterSpacing:1},
