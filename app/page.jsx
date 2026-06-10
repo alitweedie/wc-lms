@@ -232,18 +232,18 @@ const PREDICTOR_QUESTIONS = [
   { id:"golden_boot", pts:15, label:"Golden Boot – Top Scorer (player name)",         type:"freetext", cat:"15pts" },
   { id:"most_concede",pts:15, label:"Nation that concedes the most goals",            type:"nation",   cat:"15pts" },
   // ── Group Winners – 5 points each ──────────────────────────────────────────
-  { id:"group_a", pts:5, label:"Group A Winner", type:"nation", cat:"Groups" },
-  { id:"group_b", pts:5, label:"Group B Winner", type:"nation", cat:"Groups" },
-  { id:"group_c", pts:5, label:"Group C Winner", type:"nation", cat:"Groups" },
-  { id:"group_d", pts:5, label:"Group D Winner", type:"nation", cat:"Groups" },
-  { id:"group_e", pts:5, label:"Group E Winner", type:"nation", cat:"Groups" },
-  { id:"group_f", pts:5, label:"Group F Winner", type:"nation", cat:"Groups" },
-  { id:"group_g", pts:5, label:"Group G Winner", type:"nation", cat:"Groups" },
-  { id:"group_h", pts:5, label:"Group H Winner", type:"nation", cat:"Groups" },
-  { id:"group_i", pts:5, label:"Group I Winner", type:"nation", cat:"Groups" },
-  { id:"group_j", pts:5, label:"Group J Winner", type:"nation", cat:"Groups" },
-  { id:"group_k", pts:5, label:"Group K Winner", type:"nation", cat:"Groups" },
-  { id:"group_l", pts:5, label:"Group L Winner", type:"nation", cat:"Groups" },
+  { id:"group_a", pts:5, label:"Group A Winner", type:"nation", cat:"Groups", teams:["Mexico","South Africa","South Korea","Czechia"] },
+  { id:"group_b", pts:5, label:"Group B Winner", type:"nation", cat:"Groups", teams:["Canada","Bosnia & Herz.","Qatar","Switzerland"] },
+  { id:"group_c", pts:5, label:"Group C Winner", type:"nation", cat:"Groups", teams:["Brazil","Morocco","Haiti","Scotland"] },
+  { id:"group_d", pts:5, label:"Group D Winner", type:"nation", cat:"Groups", teams:["USA","Paraguay","Australia","Turkey"] },
+  { id:"group_e", pts:5, label:"Group E Winner", type:"nation", cat:"Groups", teams:["Germany","Curaçao","Ivory Coast","Ecuador"] },
+  { id:"group_f", pts:5, label:"Group F Winner", type:"nation", cat:"Groups", teams:["Netherlands","Japan","Sweden","Tunisia"] },
+  { id:"group_g", pts:5, label:"Group G Winner", type:"nation", cat:"Groups", teams:["Belgium","Egypt","Iran","New Zealand"] },
+  { id:"group_h", pts:5, label:"Group H Winner", type:"nation", cat:"Groups", teams:["Spain","Cape Verde","Saudi Arabia","Uruguay"] },
+  { id:"group_i", pts:5, label:"Group I Winner", type:"nation", cat:"Groups", teams:["France","Senegal","Iraq","Norway"] },
+  { id:"group_j", pts:5, label:"Group J Winner", type:"nation", cat:"Groups", teams:["Argentina","Algeria","Austria","Jordan"] },
+  { id:"group_k", pts:5, label:"Group K Winner", type:"nation", cat:"Groups", teams:["Portugal","DR Congo","Uzbekistan","Colombia"] },
+  { id:"group_l", pts:5, label:"Group L Winner", type:"nation", cat:"Groups", teams:["England","Croatia","Ghana","Panama"] },
   // ── 5 points ───────────────────────────────────────────────────────────────
   { id:"first_red",   pts:5, label:"First nation to receive a red card",             type:"nation",   cat:"5pts" },
   { id:"most_reds",   pts:5, label:"Nation with the most red cards overall",         type:"nation",   cat:"5pts" },
@@ -1551,7 +1551,7 @@ function PredictorInput({ q, value, onChange, placeholder }) {
     <select style={{...S.pickSelect,fontSize:11,marginBottom:0}}
       value={value} onChange={e=>onChange(e.target.value)}>
       <option value="">{placeholder||"— select a nation —"}</option>
-      {ALL_NATIONS.map(t=><option key={t} value={t}>{FLAG[t]||"🏳️"} {t}</option>)}
+      {(q.teams||ALL_NATIONS).map(t=><option key={t} value={t}>{FLAG[t]||"🏳️"} {t}</option>)}
     </select>
   );
   if (q.type === "score") {
