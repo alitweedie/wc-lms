@@ -1759,10 +1759,10 @@ const S = {
   fixtureSectionTitle:{fontSize:18,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},
   fixtureNote:{padding:"10px 16px",background:"#0b0c10",fontSize:11,color:"#777",borderBottom:"1px solid #1e1f26",lineHeight:1.6},
   deadlineBadge:{background:"transparent",color:"#E61D25",border:"1px solid #E61D25",borderRadius:2,padding:"3px 9px",fontSize:8,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",letterSpacing:1.5,textTransform:"uppercase"},
-  fixtureRow:{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"1px solid #111318"},
-  fixtureDate:{fontSize:10,color:"#666",minWidth:85,flexShrink:0,letterSpacing:0.3},
-  fixtureTeam:{fontSize:13,color:"#ccc",flex:1,minWidth:0},
-  fixtureVs:{fontSize:9,color:"#1c1c1c",flexShrink:0,padding:"0 4px",fontWeight:700,letterSpacing:2},
+  fixtureRow:{display:"grid",gridTemplateColumns:"90px 1fr 12px 1fr",alignItems:"center",gap:8,padding:"10px 16px",borderBottom:"1px solid #111318"},
+  fixtureDate:{fontSize:10,color:"#666",letterSpacing:0.3},
+  fixtureTeam:{fontSize:13,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},
+  fixtureVs:{fontSize:9,color:"#333",textAlign:"center",fontWeight:700,letterSpacing:1},
 
   // ── Section titles ────────────────────────────────────────────────────────
   sectionTitle:{fontSize:26,fontWeight:400,color:"#fff",marginBottom:14,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,textTransform:"uppercase",display:"block",borderBottom:"1px solid #1e1f26",paddingBottom:10},
