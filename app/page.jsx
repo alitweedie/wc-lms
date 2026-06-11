@@ -1393,8 +1393,41 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
         </div>
       )}
 
+      {/* Overview — shown when locked and no player selected */}
+      {!adminMode&&!selectedPlayer&&pred.locked&&(
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:9,letterSpacing:3,color:"#E61D25",fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Everyone's Picks</div>
+          {cats.filter(c=>c!=="Tiebreaker").map(cat=>{
+            const qs = PREDICTOR_QUESTIONS.filter(q=>q.cat===cat&&q.id!=="tiebreak");
+            if(!qs.length) return null;
+            return (
+              <div key={cat} style={{marginBottom:14}}>
+                <div style={{fontSize:8,letterSpacing:3,color:"#444",textTransform:"uppercase",fontWeight:700,marginBottom:6,paddingBottom:4,borderBottom:"1px solid #1e1f26"}}>{catLabels[cat]}</div>
+                {qs.map(q=>(
+                  <div key={q.id} style={{marginBottom:10}}>
+                    <div style={{fontSize:10,color:"#666",marginBottom:4,letterSpacing:0.5}}>{q.label}</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {predEntrants.map(p=>{
+                        const pick = (pred.picks[p]||{})[q.id];
+                        if(!pick) return null;
+                        return (
+                          <div key={p} style={{background:"#13141a",border:"1px solid #1e1f26",borderRadius:2,padding:"3px 8px",display:"flex",flexDirection:"column",minWidth:70}}>
+                            <span style={{fontSize:8,color:"#555",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>{p}</span>
+                            <span style={{fontSize:12,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:0.5,marginTop:1}}>{FLAG[pick]||""} {pick}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* No player selected prompt */}
-      {!adminMode&&!selectedPlayer&&(
+      {!adminMode&&!selectedPlayer&&!pred.locked&&(
         <div style={{padding:"20px 0",textAlign:"center",color:"#444",fontSize:12,letterSpacing:1}}>
           ↑ SELECT YOUR NAME ABOVE TO MAKE YOUR PICKS
         </div>
