@@ -989,7 +989,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
           {resolved
             ?<span style={S.resolvedBadge}>✓ {survivors.length} survive</span>
             :deadlinePassed
-              ?<span style={{background:"#E61D25",color:"#fff",borderRadius:2,padding:"3px 8px",fontSize:8,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"}}>⏰ LOCKED</span>
+              ?<span style={{background:"#E61D25",color:"#fff",borderRadius:2,padding:"4px 10px",fontSize:9,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"}}>🔒 LOCKED</span>
               :<span style={S.expandChevron}>{expanded?"▲":"▼"}</span>}
         </div>
       </div>
@@ -1048,7 +1048,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                   </div>
 
                   {satOut?(
-                    <div style={S.pickDisplay}><span style={{color:"#3d6b56",fontStyle:"italic"}}>sat out</span></div>
+                    <div style={{paddingTop:2,color:"#2a2a2a",fontSize:11,fontStyle:"italic",letterSpacing:0.5}}>—</div>
                   ):isAlive?(
                     <>
                       {!resolved&&!deadlinePassed?(
