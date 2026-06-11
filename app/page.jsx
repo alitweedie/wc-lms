@@ -1061,7 +1061,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                           })}
                         </select>
                       ):(
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:36,paddingTop:2}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:28,paddingTop:1}}>
                           {pick?(
                             <>
                               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:1,color:"#fff",lineHeight:1}}>{pick}</span>
@@ -1087,7 +1087,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                       )}
                     </>
                   ):(
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:36,paddingTop:2}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:28,paddingTop:1}}>
                       {pick?(
                         <>
                           <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:1,color:"#fff",lineHeight:1}}>{pick}</span>
@@ -1753,15 +1753,15 @@ const S = {
 
   // ── Pick grid ─────────────────────────────────────────────────────────────
   picksGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,background:"#0f0f0f"},
-  pickCell:{background:"#13141a",padding:"12px 14px"},
+  pickCell:{background:"#0f0f0f",padding:"5px 12px 7px",borderBottom:"1px solid #1e1f26",borderRight:"1px solid #1e1f26"},
   pickCellWin:{background:"#0a150a",borderLeft:"4px solid #a8e031"},
   pickCellElim:{background:"#1a0a0a",borderLeft:"3px solid #E61D25"},
-  pickCellGhost:{opacity:0.15,background:"#0e0f14"},
-  pickCellSatOut:{opacity:0.2,background:"#0b0c10"},
+  pickCellGhost:{background:"#0f0f0f",borderBottom:"1px solid #1e1f26"},
+  pickCellSatOut:{background:"#0a0a0a",borderLeft:"4px solid #1e1f26"},
   pickPlayer:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7},
-  pickPlayerName:{fontSize:11,fontWeight:700,color:"#fff",letterSpacing:1,textTransform:"uppercase"},
+  pickPlayerName:{fontSize:9,fontWeight:700,color:"#555",letterSpacing:2,textTransform:"uppercase",marginBottom:1},
   elimBadge:{fontSize:7,background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 5px",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"},
-  pickSelect:{width:"100%",background:"#1a1b22",border:"1px solid #1e1f26",color:"#ccc",borderRadius:2,padding:"5px 7px",fontSize:11,outline:"none",marginBottom:4},
+  pickSelect:{width:"100%",background:"#1a1b22",border:"1px solid #444",color:"#fff",borderRadius:2,padding:"5px 8px",fontSize:14,outline:"none",marginBottom:0,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1},
   pickDisplay:{fontSize:14,color:"#fff",marginBottom:0,minHeight:22,fontWeight:600},
   outcomeRow:{display:"flex",gap:4,marginTop:2},
   outcomeBtn:{flex:1,padding:"5px 0",background:"transparent",border:"1px solid #1e1f26",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.5,transition:"all 0.1s",fontFamily:"'DM Sans',sans-serif"},
