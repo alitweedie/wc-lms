@@ -1740,7 +1740,7 @@ const S = {
   roundCardResolved:{opacity:0.45},
   roundHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid #1e1f26",cursor:"pointer",gap:8},
   roundStage:{fontSize:8,color:"#E61D25",letterSpacing:4,display:"block",marginBottom:5,textTransform:"uppercase",fontWeight:700},
-  roundLabel:{margin:0,fontSize:22,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2},
+  roundLabel:{margin:0,fontSize:26,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2},
   roundDeadline:{fontSize:10,color:"#666",marginTop:4,display:"block",letterSpacing:0.5},
   resolvedBadge:{background:"#a8e031",color:"#080808",borderRadius:2,padding:"3px 10px",fontSize:8,fontWeight:700,flexShrink:0,textTransform:"uppercase",letterSpacing:2,alignSelf:"flex-start"},
   expandChevron:{color:"#2e2f38",fontSize:10,flexShrink:0,marginTop:6},
