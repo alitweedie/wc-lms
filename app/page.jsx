@@ -1383,7 +1383,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                   fontFamily:"'Oswald',sans-serif",letterSpacing:1,
                   background: selectedPlayer===null?"#E61D25":"transparent",
                   color: selectedPlayer===null?"#fff":"#9ca3af",
-                  borderColor: selectedPlayer===null?"#E61D25":"#1c1c1c",
+                  borderColor: selectedPlayer===null?"#E61D25":"#E61D25",
                 }}>
                 📋 OVERVIEW
               </button>
@@ -1419,15 +1419,37 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                 {qs.map(q=>(
                   <div key={q.id} style={{marginBottom:10}}>
                     <div style={{fontSize:10,color:"#666",marginBottom:4,letterSpacing:0.5}}>{q.label}</div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
                       {predEntrants.map(p=>{
                         const pick = (pred.picks[p]||{})[q.id];
                         if(!pick) return null;
                         return (
-                          <div key={p} style={{background:"#13141a",border:"1px solid #1e1f26",borderRadius:2,padding:"3px 8px",display:"flex",flexDirection:"column",minWidth:70}}>
-                            <span style={{fontSize:8,color:"#555",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>{p}</span>
-                            <span style={{fontSize:12,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:0.5,marginTop:1}}>{q.type==="nation"?(FLAG[pick]||"🏳️")+" ":""}{pick}</span>
-                          </div>
+                          {(()=>{
+                            const ans = pred.answers[q.id];
+                            const overrideVal = (pred.overrides||{})[q.id]?.[p];
+                            const sfIds = ["semi1","semi2","semi3","semi4"];
+                            const sfAnsList = sfIds.map(id=>pred.answers[id]).filter(Boolean).map(s=>s.toLowerCase().trim());
+                            let correct = null;
+                            if (overrideVal===true) correct=true;
+                            else if (overrideVal===false) correct=false;
+                            else if (sfIds.includes(q.id)) { if(ans) correct = sfAnsList.includes((pick||"").toLowerCase().trim()); }
+                            else if (ans && pick) {
+                              const norm = v=>v.includes("-")?v.split("-").map(Number).sort((a,b)=>a-b).join("-"):v.toLowerCase().trim();
+                              correct = norm(ans)===norm(pick);
+                            }
+                            const borderCol = correct===true?"#a8e031":correct===false?"#E61D25":"#1e1f26";
+                            const bgCol = correct===true?"#0a150a":correct===false?"#150808":"#13141a";
+                            return (
+                              <div key={p} style={{background:bgCol,border:`1px solid ${borderCol}`,borderRadius:2,padding:"3px 8px",display:"flex",flexDirection:"column"}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                                  <span style={{fontSize:8,color:"#555",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>{p}</span>
+                                  {correct===true&&<span style={{fontSize:8,color:"#a8e031",fontWeight:700}}>✓</span>}
+                                  {correct===false&&<span style={{fontSize:8,color:"#E61D25",fontWeight:700}}>✗</span>}
+                                </div>
+                                <span style={{fontSize:12,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:0.5,marginTop:1}}>{q.type==="nation"?(FLAG[pick]||"🏳️")+" ":""}{pick}</span>
+                              </div>
+                            );
+                          })()}
                         );
                       })}
                     </div>
@@ -1488,11 +1510,27 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                           onChange={v=>setPredictorPick(selectedPlayer, q.id, v)}/>
                   )}
                   {/* Show pick when locked */}
-                  {!adminMode&&pred.locked&&playerPick&&(
-                    <div style={{fontSize:11,color:"#9ca3af"}}>
-                      Your pick: <strong style={{color:"#fff"}}>{playerPick}</strong>
-                    </div>
-                  )}
+                  {!adminMode&&pred.locked&&playerPick&&(()=>{
+                    const ans = pred.answers[q.id];
+                    const overrideVal = (pred.overrides||{})[q.id]?.[selectedPlayer];
+                    const sfIds = ["semi1","semi2","semi3","semi4"];
+                    const sfAnsList = sfIds.map(id=>pred.answers[id]).filter(Boolean).map(s=>s.toLowerCase().trim());
+                    let correct = null;
+                    if (overrideVal===true) correct=true;
+                    else if (overrideVal===false) correct=false;
+                    else if (sfIds.includes(q.id)) { if(ans) correct = sfAnsList.includes((playerPick||"").toLowerCase().trim()); }
+                    else if (ans && playerPick) {
+                      const norm = v=>v.includes("-")?v.split("-").map(Number).sort((a,b)=>a-b).join("-"):v.toLowerCase().trim();
+                      correct = norm(ans)===norm(playerPick);
+                    }
+                    return (
+                      <div style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"#9ca3af"}}>
+                        <span>Your pick: <strong style={{color:"#fff"}}>{playerPick}</strong></span>
+                        {correct===true&&<span style={{fontSize:9,fontWeight:700,color:"#a8e031",background:"rgba(168,224,49,0.12)",padding:"1px 6px",borderRadius:2,letterSpacing:1}}>✓ CORRECT</span>}
+                        {correct===false&&<span style={{fontSize:9,fontWeight:700,color:"#E61D25",background:"rgba(230,29,37,0.12)",padding:"1px 6px",borderRadius:2,letterSpacing:1}}>✗ WRONG</span>}
+                      </div>
+                    );
+                  })()}
                   {/* Admin: show all players' picks + set correct answer */}
                   {adminMode&&(
                     <div style={{marginTop:4}}>
