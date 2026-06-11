@@ -985,7 +985,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
           <h2 style={S.roundLabel}>{round.label}</h2>
           {wcRound&&(()=>{ const lt=getRoundLockTime(wcRound); return <span style={S.roundDeadline}>🔒 Locks at first KO: {wcRound.fixtures[0]?.[2]} {wcRound.fixtures[0]?.[3]}</span>; })()}
         </div>
-        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
+        <div style={{display:"flex",gap:5,alignItems:"flex-start",flexShrink:0,paddingTop:2}}>
           {resolved
             ?<span style={S.resolvedBadge}>✓ {survivors.length} survive</span>
             :deadlinePassed
@@ -1101,6 +1101,9 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                 </div>
               );
             })}
+            {state.players.length % 2 !== 0 && (
+              <div style={{background:"#0f0f0f",borderBottom:"1px solid #1e1f26"}}/>
+            )}
           </div>
 
           {resolved&&(
@@ -1749,7 +1752,7 @@ const S = {
   closeRoundBtn:{background:"transparent",border:"1px solid #E61D25",color:"#E61D25",borderRadius:2,padding:"4px 12px",cursor:"pointer",fontSize:8,letterSpacing:2,fontFamily:"'DM Sans',sans-serif",fontWeight:700,textTransform:"uppercase"},
 
   // ── Pick grid ─────────────────────────────────────────────────────────────
-  picksGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,background:"#1e1f26"},
+  picksGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,background:"#0f0f0f"},
   pickCell:{background:"#13141a",padding:"12px 14px"},
   pickCellWin:{background:"#0a150a",borderLeft:"4px solid #a8e031"},
   pickCellElim:{background:"#1a0a0a",borderLeft:"3px solid #E61D25"},
