@@ -739,7 +739,7 @@ export default function App() {
 
   if (loading) return (
     <div style={S.loadScreen}><div style={S.spinner}/>
-      <p style={{color:"#e61d25",marginTop:16,fontFamily:"'Inter',sans-serif",letterSpacing:4}}>LOADING…</p>
+      <p style={{color:"#e61d25",marginTop:16,fontFamily:"'DM Sans',sans-serif",letterSpacing:4}}>LOADING…</p>
     </div>
   );
 
@@ -908,19 +908,19 @@ function ReopenRoundPanel({ onReopen }) {
         <div style={{display:"flex",gap:6}}>
           <button
             onClick={e=>{e.stopPropagation(); onReopen(); setConfirming(false);}}
-            style={{background:"rgba(245,158,11,0.2)",border:"1px solid #f59e0b",color:"#a8e031",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+            style={{background:"rgba(245,158,11,0.2)",border:"1px solid #f59e0b",color:"#a8e031",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700}}>
             ✓ CONFIRM
           </button>
           <button
             onClick={e=>{e.stopPropagation(); setConfirming(false);}}
-            style={{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'Oswald',sans-serif"}}>
+            style={{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif"}}>
             CANCEL
           </button>
         </div>
       ) : (
         <button
           onClick={e=>{e.stopPropagation(); setConfirming(true);}}
-          style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.4)",color:"#a8e031",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,letterSpacing:1,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+          style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.4)",color:"#a8e031",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,letterSpacing:1,fontFamily:"'DM Sans',sans-serif",fontWeight:700}}>
           ↩ REOPEN ROUND
         </button>
       )}
@@ -944,7 +944,7 @@ function CloseRoundPanel({ unpickedAlive, onClose }) {
           </button>
           <button
             onClick={e=>{e.stopPropagation(); setConfirming(false);}}
-            style={{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'Oswald',sans-serif"}}>
+            style={{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif"}}>
             CANCEL
           </button>
         </div>
@@ -1176,7 +1176,7 @@ function FixturesTab({ game }) {
   return (
     <div>
       <h2 style={S.sectionTitle}>FIXTURES BY ROUND</h2>
-      <p style={{fontSize:11,color:"#6b7280",marginBottom:10,fontFamily:"sans-serif"}}>All times BST. Use these to decide which team to pick.</p>
+      <p style={{fontSize:11,color:"#6b7280",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>All times BST. Use these to decide which team to pick.</p>
       {game.rounds.map(round=>{
         const wcRound=ROUNDS.find(r=>r.id===round.id);
         if (!wcRound) return null;
@@ -1224,7 +1224,7 @@ function MoneyTab({ state }) {
   return (
     <div>
       <h2 style={S.sectionTitle}>MONEY TRACKER</h2>
-      <p style={{fontSize:11,color:"#6b7280",marginBottom:12,fontFamily:"sans-serif"}}>
+      <p style={{fontSize:11,color:"#6b7280",marginBottom:12,fontFamily:"'DM Sans',sans-serif"}}>
         £{ENTRY_FEE} per game entered. Only players who pick in round 1 of each game pay in.
       </p>
 
@@ -1354,7 +1354,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
       <div style={S.predHeader}>
         <div>
           <h2 style={{...S.sectionTitle,marginBottom:4}}>TOURNAMENT PREDICTOR</h2>
-          <p style={{fontSize:11,color:"#9ca3af",fontFamily:"sans-serif",margin:0}}>
+          <p style={{fontSize:11,color:"#9ca3af",fontFamily:"'DM Sans',sans-serif",margin:0}}>
             £{PREDICTOR_FEE} entry · {predEntrants.length} entered · Pot: <strong style={{color:"#a8e031"}}>£{pot}</strong>
           </p>
         </div>
@@ -1380,7 +1380,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
               <button onClick={()=>setSelectedPlayer(null)}
                 style={{
                   padding:"5px 12px",borderRadius:20,border:"1px solid",cursor:"pointer",fontSize:12,
-                  fontFamily:"'Oswald',sans-serif",letterSpacing:1,
+                  fontFamily:"'DM Sans',sans-serif",letterSpacing:1,
                   background: selectedPlayer===null?"#E61D25":"transparent",
                   color: selectedPlayer===null?"#fff":"#9ca3af",
                   borderColor: selectedPlayer===null?"#E61D25":"#E61D25",
@@ -1392,7 +1392,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
               <button key={p} onClick={()=>setSelectedPlayer(p)}
                 style={{
                   padding:"5px 12px",borderRadius:20,border:"1px solid",cursor:"pointer",fontSize:12,
-                  fontFamily:"'Oswald',sans-serif",letterSpacing:1,
+                  fontFamily:"'DM Sans',sans-serif",letterSpacing:1,
                   background: selectedPlayer===p?"#E61D25":"transparent",
                   color: selectedPlayer===p?"#0a0a0f":"#9ca3af",
                   borderColor: selectedPlayer===p?"#E61D25":"#1c1c1c",
@@ -1401,7 +1401,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
               </button>
             ))}
           </div>
-          {pred.locked&&<p style={{fontSize:11,color:"#e53935",marginTop:6,fontFamily:"sans-serif"}}>🔒 Predictor is locked — no more picks accepted.</p>}
+          {pred.locked&&<p style={{fontSize:11,color:"#e53935",marginTop:6,fontFamily:"'DM Sans',sans-serif"}}>🔒 Predictor is locked — no more picks accepted.</p>}
         </div>
       )}
 
@@ -1572,7 +1572,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
         </div>
       ))}
       {predEntrants.length===0&&(
-        <p style={{fontSize:12,color:"#6b7280",fontStyle:"italic",fontFamily:"sans-serif"}}>No entries yet — pick your player above and start predicting!</p>
+        <p style={{fontSize:12,color:"#6b7280",fontStyle:"italic",fontFamily:"'DM Sans',sans-serif"}}>No entries yet — pick your player above and start predicting!</p>
       )}
     </div>
   );
