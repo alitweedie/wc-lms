@@ -1060,7 +1060,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                           {pick?(
                             <span style={{color:"#fff"}}>
                               {FLAG[pick]||"🏳️"} <strong>{pick}</strong>
-                              {deadlinePassed&&!resolved&&<span style={{marginLeft:6,fontSize:8,color:"#E61D25",letterSpacing:1,fontWeight:700,textTransform:"uppercase"}}>🔒 LOCKED</span>}
+
                             </span>
                           ):deadlinePassed&&!resolved?(
                             <span style={{color:"#E61D25",fontSize:10,fontWeight:700,letterSpacing:1}}>⏰ NO PICK — DEADLINE PASSED</span>
