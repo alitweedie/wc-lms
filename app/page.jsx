@@ -982,15 +982,15 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
       <div style={S.roundHeader} onClick={()=>setExpanded(e=>!e)}>
         <div style={{flex:1,minWidth:0}}>
           <span style={S.roundStage}>{round.stage}</span>
-          <h2 style={S.roundLabel}>{round.label}</h2>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <h2 style={S.roundLabel}>{round.label}</h2>
+            {resolved
+              ?<span style={S.resolvedBadge}>✓ {survivors.length} survive</span>
+              :deadlinePassed
+                ?<span style={{background:"#E61D25",color:"#fff",borderRadius:2,padding:"4px 10px",fontSize:9,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>🔒 LOCKED</span>
+                :<span style={S.expandChevron}>{expanded?"▲":"▼"}</span>}
+          </div>
           {wcRound&&(()=>{ const lt=getRoundLockTime(wcRound); return <span style={S.roundDeadline}>🔒 Locks at first KO: {wcRound.fixtures[0]?.[2]} {wcRound.fixtures[0]?.[3]}</span>; })()}
-        </div>
-        <div style={{display:"flex",gap:5,alignItems:"flex-start",flexShrink:0,paddingTop:2}}>
-          {resolved
-            ?<span style={S.resolvedBadge}>✓ {survivors.length} survive</span>
-            :deadlinePassed
-              ?<span style={{background:"#E61D25",color:"#fff",borderRadius:2,padding:"4px 10px",fontSize:9,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"}}>🔒 LOCKED</span>
-              :<span style={S.expandChevron}>{expanded?"▲":"▼"}</span>}
         </div>
       </div>
 
