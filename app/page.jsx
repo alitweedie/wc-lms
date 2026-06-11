@@ -174,8 +174,6 @@ const ROUNDS = [
 
 const isPlaceholder = t => !t || t.includes("Winner") || t.includes("TBD") || t.includes("Runner") || t.includes("R32") || t.includes("R16") || t.includes("QF") || t.includes("SF");
 
-// Parse a date+time string from fixtures e.g. "Thu 11 Jun" + "20:00 BST"
-// BST = UTC+1, so subtract 1 hour to get UTC
 const MONTH_MAP = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
 function parseKickoff(dateStr, timeStr) {
   try {
@@ -186,12 +184,10 @@ function parseKickoff(dateStr, timeStr) {
     const [,hh,mm] = tm;
     const month = MONTH_MAP[mon];
     if (month === undefined) return null;
-    // BST = UTC+1, subtract 1hr for UTC
     return new Date(Date.UTC(2026, month, parseInt(day), parseInt(hh) - 1, parseInt(mm)));
   } catch { return null; }
 }
 
-// Lock time = kick-off of the first fixture in the round
 function getRoundLockTime(wcRound) {
   if (!wcRound || !wcRound.fixtures || wcRound.fixtures.length === 0) return null;
   const [,, date, time] = wcRound.fixtures[0];
@@ -208,9 +204,8 @@ const realTeams = r => [...new Set(r.fixtures.flatMap(([h,a])=>[h,a]).filter(t=>
 const OUTCOME = { WIN:"win", LOSE:"lose", DRAW:"draw", PENDING:"" };
 const POLL_MS = 5000;
 const ENTRY_FEE = 2;
-const PREDICTOR_FEE = 10; // £10 per person for the predictor game
+const PREDICTOR_FEE = 10;
 
-// All 48 WC 2026 teams for dropdowns
 const ALL_NATIONS = [
   "Algeria","Argentina","Australia","Austria","Belgium","Bosnia & Herz.",
   "Brazil","Canada","Cape Verde","Colombia","Croatia","Curaçao",
@@ -222,7 +217,6 @@ const ALL_NATIONS = [
 ].sort();
 
 const PREDICTOR_QUESTIONS = [
-  // ── 15 points ──────────────────────────────────────────────────────────────
   { id:"winner",      pts:15, label:"Tournament Winner",                              type:"nation",   cat:"15pts" },
   { id:"runner_up",   pts:15, label:"Runner-Up",                                      type:"nation",   cat:"15pts" },
   { id:"semi1",       pts:15, label:"Semi-Finalist #1",                               type:"nation",   cat:"15pts" },
@@ -231,7 +225,6 @@ const PREDICTOR_QUESTIONS = [
   { id:"semi4",       pts:15, label:"Semi-Finalist #4",                               type:"nation",   cat:"15pts" },
   { id:"golden_boot", pts:15, label:"Golden Boot – Top Scorer (player name)",         type:"freetext", cat:"15pts" },
   { id:"most_concede",pts:15, label:"Nation that concedes the most goals",            type:"nation",   cat:"15pts" },
-  // ── Group Winners – 5 points each ──────────────────────────────────────────
   { id:"group_a", pts:5, label:"Group A Winner", type:"nation", cat:"Groups", teams:["Mexico","South Africa","South Korea","Czechia"] },
   { id:"group_b", pts:5, label:"Group B Winner", type:"nation", cat:"Groups", teams:["Canada","Bosnia & Herz.","Qatar","Switzerland"] },
   { id:"group_c", pts:5, label:"Group C Winner", type:"nation", cat:"Groups", teams:["Brazil","Morocco","Haiti","Scotland"] },
@@ -244,7 +237,6 @@ const PREDICTOR_QUESTIONS = [
   { id:"group_j", pts:5, label:"Group J Winner", type:"nation", cat:"Groups", teams:["Argentina","Algeria","Austria","Jordan"] },
   { id:"group_k", pts:5, label:"Group K Winner", type:"nation", cat:"Groups", teams:["Portugal","DR Congo","Uzbekistan","Colombia"] },
   { id:"group_l", pts:5, label:"Group L Winner", type:"nation", cat:"Groups", teams:["England","Croatia","Ghana","Panama"] },
-  // ── 5 points ───────────────────────────────────────────────────────────────
   { id:"first_red",   pts:5, label:"First nation to receive a red card",             type:"nation",   cat:"5pts" },
   { id:"most_reds",   pts:5, label:"Nation with the most red cards overall",         type:"nation",   cat:"5pts" },
   { id:"boot_runner", pts:5, label:"Golden Boot Runner-Up (player name)",            type:"freetext", cat:"5pts" },
@@ -252,7 +244,6 @@ const PREDICTOR_QUESTIONS = [
   { id:"own_goals",   pts:5, label:"Nation that scores the most own goals",          type:"nation",   cat:"5pts" },
   { id:"high_score",  pts:5, label:"Predict the score of the highest-scoring match", type:"score", cat:"5pts" },
   { id:"most_pens",   pts:5, label:"Nation that wins the most penalty shootouts",    type:"nation",   cat:"5pts" },
-  // ── Tiebreaker ─────────────────────────────────────────────────────────────
   { id:"tiebreak",    pts:0, label:"Total goals scored in the tournament (closest wins)", type:"number", cat:"Tiebreaker" },
 ];
 
@@ -285,71 +276,59 @@ function defaultState() {
     players:["Ben","Tom","James","Tweedie","Kieran","Tucker","Ash","Toynbee"],
     games:[buildGame(1,0)],
     predictor: {
-      picks: {},    // picks[player][questionId] = answer
-      answers: {},  // answers[questionId] = correct answer (admin sets)
-      overrides: {}, // overrides[questionId][player] = true/false (admin manual tick for freetext)
+      picks: {},
+      answers: {},
+      overrides: {},
       locked: false,
     },
     lastUpdated:0,
   };
 }
 
-// ─── A round is resolved once every entrant who is alive at its start has a final outcome ──
-// "Final outcome" = WIN, LOSE, or DRAW. PENDING / missing = not yet resolved.
 function roundResolved(round) {
   return Object.values(round.outcomes).some(o => o===OUTCOME.WIN || o===OUTCOME.LOSE || o===OUTCOME.DRAW);
 }
 
-// ─── Who entered a game: anyone who made a pick in round 0 ────────────────────
-// Before round 0 resolves, we treat everyone as a potential entrant so picks can be submitted.
 function gameEntrants(game, players) {
   const r0 = game.rounds[0];
   if (!r0) return players;
-  if (!roundResolved(r0)) return players; // round 0 not closed yet
-  // Once round 0 closes, only those with a pick (or a non-pending outcome) entered
+  if (!roundResolved(r0)) return players;
   return players.filter(p => !!r0.picks[p]);
 }
 
-// ─── Pot ─────────────────────────────────────────────────────────────────────
-// Count players who have actually picked in round 0 (entered), not all players.
-// Before round 0 closes, count current picks. After it closes, count confirmed entrants.
 function calcPot(game, players) {
   const r0 = game.rounds[0];
   const pickedCount = r0 ? Object.values(r0.picks).filter(p => !!p).length : 0;
   const entrantCount = roundResolved(r0)
-    ? gameEntrants(game, players).length  // locked in after round closes
-    : pickedCount;                         // live count of picks so far
+    ? gameEntrants(game, players).length
+    : pickedCount;
   return entrantCount * ENTRY_FEE + (game.rollover || 0);
 }
 
-// ─── Who was eliminated and in which round ────────────────────────────────────
-// Returns: roundId = eliminated that round, -1 = sat out (never entered), null = still alive
 function getElimRound(game, player, players) {
   const entrants = gameEntrants(game, players);
-  if (!entrants.includes(player)) return -1; // sat out
+  if (!entrants.includes(player)) return -1;
 
   for (let i = 0; i < game.rounds.length; i++) {
     const r = game.rounds[i];
-    if (!roundResolved(r)) break; // stop at first unresolved round
+    if (!roundResolved(r)) break;
     const pick = r.picks[player];
     const o = r.outcomes[player];
-    // Round 0: no pick = sat out (handled above). Round 1+: no pick = eliminated.
     if (i > 0 && !pick) return r.id;
     if (o === OUTCOME.LOSE || o === OUTCOME.DRAW) return r.id;
   }
-  return null; // still alive
+  return null;
 }
 
 function buildElimMap(game, players) {
   const m = {};
   for (const p of players) {
     const rid = getElimRound(game, p, players);
-    if (rid !== null) m[p] = rid; // null = alive, -1 = sat out, roundId = eliminated
+    if (rid !== null) m[p] = rid;
   }
   return m;
 }
 
-// Who is alive going INTO the round at roundIndex (0-based within game.rounds)
 function getAliveAtStart(game, players, roundIndex) {
   const entrants = gameEntrants(game, players);
   const elim = {};
@@ -367,85 +346,62 @@ function getAliveAtStart(game, players, roundIndex) {
   return entrants.filter(p => !elim[p]);
 }
 
-// ─── Check if the game should end after any outcome change ────────────────────
-// A round is "fully settled" when every alive-at-start player has a WIN/LOSE/DRAW outcome.
 function isRoundFullySettled(round, aliveAtStart) {
   return aliveAtStart.every(p => {
     const o = round.outcomes[p];
     const pick = round.picks[p];
-    // No pick AND round is resolved = auto-loss (counts as settled)
     if (!pick && roundResolved(round)) return true;
     return o === OUTCOME.WIN || o === OUTCOME.LOSE || o === OUTCOME.DRAW;
   });
 }
 
-// Shared game-end evaluation — call after any outcome mutation
 function evaluateGameEnd(g, players) {
-  // Find the last fully-settled round
   let lastSettledIdx = -1;
   for (let i = 0; i < g.rounds.length; i++) {
     const alive = getAliveAtStart(g, players, i);
-    // If nobody is alive going into this round AND no outcomes have been set,
-    // this round was never actually played — stop here.
     if (alive.length === 0 && !roundResolved(g.rounds[i])) break;
     if (isRoundFullySettled(g.rounds[i], alive)) {
       lastSettledIdx = i;
     } else {
-      break; // stop at first unsettled round
+      break;
     }
   }
-  if (lastSettledIdx < 0) return; // nothing settled yet
+  if (lastSettledIdx < 0) return;
 
   const entrants = gameEntrants(g, players);
   const lastRound = g.rounds[lastSettledIdx];
   const isFinalRound = lastSettledIdx === g.rounds.length - 1;
 
-  // Count survivors of the last fully-settled round (players who got WIN)
   const survivors = entrants.filter(p => lastRound.outcomes[p] === OUTCOME.WIN);
-  // Count players eliminated at or before this round
   const elimMap = buildElimMap(g, players);
   const alive = entrants.filter(p => elimMap[p] == null);
 
-  // Game ends when:
-  // - Exactly 1 player survives the last settled round (last man standing)
-  // - Nobody survives (rollover)
-  // - It's the final round and someone won
-  // IMPORTANT: we use survivors from lastRound (not alive) to avoid
-  // triggering game-end mid-round when others still have PENDING outcomes.
-  const roundSurvivors = survivors.length;
-  const roundEliminated = entrants.filter(p =>
-    lastRound.outcomes[p] === OUTCOME.LOSE || lastRound.outcomes[p] === OUTCOME.DRAW
-  ).length;
-  // Only check pending for players who were alive at the start of the last settled round
   const aliveAtLastRound = getAliveAtStart(g, players, lastSettledIdx);
   const roundPending = aliveAtLastRound.filter(p => {
     const o = lastRound.outcomes[p];
     const pick = lastRound.picks[p];
-    // No pick = auto-loss = settled. Only truly pending if they had a pick but no outcome yet.
     if (!pick) return false;
     return !o || o === OUTCOME.PENDING;
   }).length;
 
-  // Don't end the game if any alive player with a pick still has a pending outcome
   if (roundPending > 0) return;
 
-  const gameOver = roundSurvivors <= 1 || isFinalRound;
+  const gameOver = survivors.length <= 1 || isFinalRound;
   if (!gameOver) return;
 
   g.complete = true;
-  g.winners = roundSurvivors === 1 ? survivors : (isFinalRound && roundSurvivors > 0 ? survivors : []);
-  if (roundSurvivors === 0) g.rolledOver = true;
+  g.winners = survivors.length === 1 ? survivors : (isFinalRound && survivors.length > 0 ? survivors : []);
+  if (survivors.length === 0) g.rolledOver = true;
 
   const pot = calcPot(g, players);
   const wcIdx = ROUNDS.findIndex(wr => wr.id === lastRound.id);
   const nextWCIdx = Math.min(wcIdx + 1, ROUNDS.length - 1);
-  const newGame = buildGame(0, nextWCIdx); // id set by caller
+  const newGame = buildGame(0, nextWCIdx);
   newGame.rollover = alive.length === 0 ? pot : 0;
   return newGame;
 }
 
 function usedTeams(game, player, roundIndex) {
-  // Track all picks across all rounds — no repeats ever allowed.
   const s = new Set();
   for (const r of game.rounds.slice(0, roundIndex)) {
     if (r.picks[player]) s.add(r.picks[player]);
@@ -453,7 +409,6 @@ function usedTeams(game, player, roundIndex) {
   return s;
 }
 
-// ─── Money tracker: compute P&L per player across all games ──────────────────
 function computeMoneyTracker(state) {
   const tracker = {};
   for (const p of state.players) tracker[p] = { spent:0, won:0, games:[] };
@@ -463,8 +418,6 @@ function computeMoneyTracker(state) {
     const pot = calcPot(game, state.players);
 
     for (const p of state.players) {
-      // A player only pays in if they actually made a pick in round 0.
-      // Before round 0 closes, only count if they have a pick already set.
       const hasPick = r0 && !!r0.picks[p];
       const entered = hasPick;
       const isWinner = game.complete && game.winners.includes(p);
@@ -484,20 +437,16 @@ function computeMoneyTracker(state) {
     }
   }
 
-  // Predictor entry and winnings
   const pred = state.predictor || { picks:{}, answers:{}, locked:false };
   const predEntrants = state.players.filter(p => pred.picks[p] && Object.keys(pred.picks[p]).some(id => id !== "tiebreak" && pred.picks[p][id] !== "" && pred.picks[p][id] !== null && pred.picks[p][id] !== undefined));
   const predPot = predEntrants.length * PREDICTOR_FEE;
-  // Score each player
   const scores = {};
   for (const p of state.players) {
     scores[p] = 0;
     const picks = pred.picks[p] || {};
-    // Semi-finalists are unordered — check both SF picks against both SF answers
     const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).map(s=>s.toLowerCase().trim());
     for (const q of PREDICTOR_QUESTIONS) {
       if (q.id === "semi1" || q.id === "semi2" || q.id === "semi3" || q.id === "semi4") {
-        // Award pts if this pick appears anywhere in the sf answers pool
         const pick = (picks[q.id]||"").toLowerCase().trim();
         if (pick && sfAnswers.includes(pick)) scores[p] += q.pts;
         continue;
@@ -515,9 +464,7 @@ function computeMoneyTracker(state) {
     }
   }
   const maxScore = Math.max(...Object.values(scores), 0);
-  // Find leading entrants by score
   let predWinners = maxScore > 0 ? state.players.filter(p => scores[p] === maxScore && predEntrants.includes(p)) : [];
-  // Tiebreaker: if multiple players tied on max score, closest tiebreak answer wins
   if (predWinners.length > 1 && pred.answers["tiebreak"]) {
     const correct = parseFloat(pred.answers["tiebreak"]);
     if (!isNaN(correct)) {
@@ -607,21 +554,18 @@ export default function App() {
     if (r) { r.picks[player]=team; r.outcomes[player]=OUTCOME.PENDING; }
   });
 
-  // Close a round: mark every alive player with no pick, or no final outcome, as LOSE.
   const closeRound = (gi, roundId) => update(s => {
     const g = s.games[gi];
     const r = g.rounds.find(r => r.id === roundId);
     if (!r) return;
     const roundIndex = g.rounds.indexOf(r);
     const aliveAtStart = getAliveAtStart(g, s.players, roundIndex);
-    // Mark everyone without a resolved outcome as LOSE
     for (const p of aliveAtStart) {
       const o = r.outcomes[p];
       if (o !== OUTCOME.WIN && o !== OUTCOME.LOSE && o !== OUTCOME.DRAW) {
         r.outcomes[p] = OUTCOME.LOSE;
       }
     }
-    // Evaluate game end
     const newGame = evaluateGameEnd(g, s.players);
     if (newGame) {
       const alreadyExists = s.games.length > gi + 1;
@@ -633,22 +577,17 @@ export default function App() {
     }
   });
 
-  // Reopen a round: clear all outcomes, un-complete the game if it was triggered by this round
   const reopenRound = (gi, roundId) => update(s => {
     const g = s.games[gi];
     const r = g.rounds.find(r => r.id === roundId);
     if (!r) return;
-    // Clear all outcomes for this round
     for (const p of s.players) {
       if (r.outcomes[p] !== undefined) r.outcomes[p] = OUTCOME.PENDING;
     }
-    // If the game was completed, un-complete it and remove the auto-spawned next game
     if (g.complete) {
       g.complete = false;
       g.winners = [];
       g.rolledOver = false;
-      // Remove the last game if it was auto-spawned as a result of this game completing
-      // (only remove if it has no picks at all yet)
       if (s.games.length > gi + 1) {
         const nextGame = s.games[gi + 1];
         const hasAnyPicks = nextGame.rounds.some(r => Object.values(r.picks).some(p => !!p));
@@ -659,20 +598,16 @@ export default function App() {
     }
   });
 
-  // Set a single player's outcome then check if the game has ended
   const setOutcome = (gi, roundId, player, outcome) => update(s => {
     const g = s.games[gi];
     const r = g.rounds.find(r => r.id === roundId);
     if (!r) return;
-    // Toggle off if already set to same value
     r.outcomes[player] = (r.outcomes[player] === outcome) ? OUTCOME.PENDING : outcome;
 
-    // If game was previously complete, reset it — outcome change may invalidate the result
     if (g.complete) {
       g.complete = false;
       g.winners = [];
       g.rolledOver = false;
-      // Remove the auto-spawned next game if it has no picks yet
       if (s.games.length > gi + 1) {
         const nextGame = s.games[gi + 1];
         const hasAnyPicks = nextGame.rounds.some(r => Object.values(r.picks).some(p => !!p));
@@ -682,7 +617,6 @@ export default function App() {
 
     const newGame = evaluateGameEnd(g, s.players);
     if (newGame) {
-      // Only push if no next game already exists for this game
       const alreadyExists = s.games.length > gi + 1;
       if (!alreadyExists) {
         newGame.id = s.games.length + 1;
@@ -696,12 +630,10 @@ export default function App() {
     if (!s.predictor) s.predictor = { picks:{}, answers:{}, locked:false };
     if (!s.predictor.picks[player]) s.predictor.picks[player] = {};
     if (answer === "" || answer === null || answer === undefined) {
-      // Remove empty picks so entrant detection stays accurate
       delete s.predictor.picks[player][questionId];
     } else {
       s.predictor.picks[player][questionId] = answer;
     }
-    // If no non-tiebreak picks remain, remove the player entry entirely
     const remaining = Object.keys(s.predictor.picks[player]).filter(id => id !== "tiebreak");
     if (remaining.length === 0) {
       delete s.predictor.picks[player];
@@ -747,7 +679,6 @@ export default function App() {
   const gi = state.games.indexOf(game);
   const elimMap = buildElimMap(game, state.players);
   const entrants = gameEntrants(game, state.players);
-  // For the alive counter, only count players who have actually picked in round 1
   const r0picks = game.rounds[0] ? state.players.filter(p => !!game.rounds[0].picks[p]) : [];
   const actualEntrants = roundResolved(game.rounds[0]) ? entrants : r0picks;
   const aliveNow = actualEntrants.filter(p=>elimMap[p]==null);
@@ -757,7 +688,6 @@ export default function App() {
   const predEntrantCount = state.players.filter(p => pred.picks[p] && Object.keys(pred.picks[p]).some(id => id !== "tiebreak" && pred.picks[p][id] !== "" && pred.picks[p][id] !== null && pred.picks[p][id] !== undefined)).length;
   const predPotTotal = predEntrantCount * PREDICTOR_FEE;
 
-  // Show played rounds (collapsed by default) on complete games; all rounds while in progress
   const lastResolvedIdx = game.rounds.reduce((acc,r,i)=>roundResolved(r)?i:acc, -1);
   const trackerRounds = game.complete
     ? game.rounds.slice(0, lastResolvedIdx + 1)
@@ -815,7 +745,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-      {/* Status banners — pinned in header, tracker tab only */}
         {tab==="tracker"&&game.complete&&game.winners.length>0&&(
           <div style={S.winnerBanner}>
             <div style={{fontSize:28}}>🏆</div>
@@ -846,7 +775,6 @@ export default function App() {
       </header>
 
       <main style={S.main}>
-
         {tab==="tracker"&&(
           <TrackerTab rounds={trackerRounds} game={game} gi={gi} state={state}
             elimMap={elimMap} entrants={entrants} setPick={setPick} setOutcome={setOutcome}
@@ -968,7 +896,6 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
   const [expanded, setExpanded] = useState(!resolved && !game.complete);
   useEffect(()=>{ if (!resolved && !game.complete) setExpanded(true); },[resolved, game.complete]);
 
-  // Players alive at start of this round without a final outcome (WIN/LOSE/DRAW)
   const unpickedAlive = aliveAtStart.filter(p => {
     const o = round.outcomes[p];
     return o !== OUTCOME.WIN && o !== OUTCOME.LOSE && o !== OUTCOME.DRAW;
@@ -1016,12 +943,11 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
           <div style={S.picksGrid}>
             {state.players.map(player=>{
               const entered = entrants.includes(player);
-              const satOut = !entered && resolved; // sat out round 1
+              const satOut = !entered && resolved;
               const isAlive = aliveAtStart.includes(player);
               const pick = round.picks[player];
               const outcome = round.outcomes[player];
               const used = usedTeams(game, player, roundIndex);
-              // Group stage: only show teams playing that round. Knockouts: show all nations.
               const isKnockout = wcRound && wcRound.id >= 4;
               const availTeams = wcRound
                 ? (isKnockout ? ALL_NATIONS : realTeams(wcRound))
@@ -1138,7 +1064,6 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                   );
                 })}
               </div>
-              {/* Admin: set correct minute */}
               {isEditing&&(
                 <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10}}>
                   <span style={{fontSize:9,letterSpacing:2,color:"#444",textTransform:"uppercase",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Correct minute:</span>
@@ -1217,8 +1142,6 @@ function FixturesTab({ game }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function MoneyTab({ state }) {
   const tracker = computeMoneyTracker(state);
-
-  // Sort by net (highest first)
   const sorted = [...state.players].sort((a,b)=>tracker[b].net - tracker[a].net);
 
   return (
@@ -1259,10 +1182,8 @@ function MoneyTab({ state }) {
         );
       })}
 
-      {/* Running totals per game */}
       <h2 style={{...S.sectionTitle,marginTop:20}}>BY GAME</h2>
       {state.games.map(game=>{
-        // Use actual picks in round 0 — not gameEntrants which returns all before round closes
         const r0 = game.rounds[0];
         const actualEntrants = state.players.filter(p => r0 && !!r0.picks[p]);
         const pot = calcPot(game, state.players);
@@ -1309,7 +1230,6 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
   const [adminMode, setAdminMode] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
-  // Group questions by category
   const cats = ["15pts","Groups","5pts","Tiebreaker"];
   const catLabels = {
     "15pts":"⭐ 15 Points Each",
@@ -1318,7 +1238,6 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
     "Tiebreaker":"🎯 Tiebreaker"
   };
 
-  // Score computation — semi-finalists are unordered
   const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).map(s=>s.toLowerCase().trim());
   const scores = {};
   for (const p of state.players) {
@@ -1330,12 +1249,10 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
         if (pick && sfAnswers.includes(pick)) scores[p] += q.pts;
         continue;
       }
-      // For freetext questions, check manual override first
       if (q.type === "freetext") {
         const overrideVal = (pred.overrides||{})[q.id]?.[p];
         if (overrideVal === true) { scores[p] += q.pts; continue; }
-        if (overrideVal === false) continue; // explicitly marked wrong
-        // Fall through to text match if no override set
+        if (overrideVal === false) continue;
       }
       const ans = pred.answers[q.id];
       if (ans && picks[q.id]) {
@@ -1374,16 +1291,15 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
 
       {/* Player selector */}
       {!adminMode&&(
-        <div style={{padding:"8px 0 12px"}}>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        <div style={{paddingBottom:14,borderBottom:"1px solid #1e1f26",marginBottom:14}}>
+          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
             {pred.locked&&(
               <button onClick={()=>setSelectedPlayer(null)}
                 style={{
-                  padding:"5px 12px",borderRadius:20,border:"1px solid",cursor:"pointer",fontSize:12,
-                  fontFamily:"'DM Sans',sans-serif",letterSpacing:1,
+                  ...S.predPlayerBtn,
                   background: selectedPlayer===null?"#E61D25":"transparent",
-                  color: selectedPlayer===null?"#fff":"#9ca3af",
-                  borderColor: selectedPlayer===null?"#E61D25":"#E61D25",
+                  color: selectedPlayer===null?"#fff":"#555",
+                  borderColor: selectedPlayer===null?"#E61D25":"#252525",
                 }}>
                 📋 OVERVIEW
               </button>
@@ -1391,35 +1307,39 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
             {state.players.map(p=>(
               <button key={p} onClick={()=>setSelectedPlayer(p)}
                 style={{
-                  padding:"5px 12px",borderRadius:20,border:"1px solid",cursor:"pointer",fontSize:12,
-                  fontFamily:"'DM Sans',sans-serif",letterSpacing:1,
+                  ...S.predPlayerBtn,
                   background: selectedPlayer===p?"#E61D25":"transparent",
-                  color: selectedPlayer===p?"#0a0a0f":"#9ca3af",
-                  borderColor: selectedPlayer===p?"#E61D25":"#1c1c1c",
+                  color: selectedPlayer===p?"#fff":"#888",
+                  borderColor: selectedPlayer===p?"#E61D25":"#252525",
                 }}>
-                {p}
+                {p.toUpperCase()}
               </button>
             ))}
           </div>
-          {pred.locked&&<p style={{fontSize:11,color:"#e53935",marginTop:6,fontFamily:"'DM Sans',sans-serif"}}>🔒 Predictor is locked — no more picks accepted.</p>}
+          {pred.locked&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:10,padding:"8px 12px",background:"#100a0a",border:"1px solid #2a1010",borderRadius:2}}>
+              <span style={{fontSize:10,color:"#E61D25",fontWeight:700,letterSpacing:1}}>🔒 LOCKED</span>
+              <span style={{fontSize:10,color:"#555",letterSpacing:0.5}}>No more picks accepted</span>
+            </div>
+          )}
         </div>
       )}
 
       {/* Overview — shown when locked and no player selected */}
       {!adminMode&&!selectedPlayer&&pred.locked&&(
         <div style={{marginBottom:16}}>
-          <div style={{fontSize:9,letterSpacing:3,color:"#E61D25",fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Everyone&apos;s Picks</div>
+          <div style={{fontSize:9,letterSpacing:3,color:"#E61D25",fontWeight:700,textTransform:"uppercase",marginBottom:12,fontFamily:"'DM Sans',sans-serif"}}>EVERYONE&apos;S PICKS</div>
           {predEntrants.length===0&&<div style={{color:"#444",fontSize:11,padding:"8px 0"}}>No picks submitted yet.</div>}
           {cats.filter(c=>c!=="Tiebreaker").map(cat=>{
             const qs = PREDICTOR_QUESTIONS.filter(q=>q.cat===cat&&q.id!=="tiebreak");
             if(!qs.length) return null;
             return (
-              <div key={cat} style={{marginBottom:14}}>
-                <div style={{fontSize:8,letterSpacing:3,color:"#444",textTransform:"uppercase",fontWeight:700,marginBottom:6,paddingBottom:4,borderBottom:"1px solid #1e1f26"}}>{catLabels[cat]}</div>
+              <div key={cat} style={{marginBottom:18}}>
+                <div style={S.overviewCatHeader}>{catLabels[cat]}</div>
                 {qs.map(q=>(
-                  <div key={q.id} style={{marginBottom:10}}>
-                    <div style={{fontSize:10,color:"#666",marginBottom:4,letterSpacing:0.5}}>{q.label}</div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4}}>
+                  <div key={q.id} style={{marginBottom:12}}>
+                    <div style={S.overviewQLabel}>{q.label}</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:1,background:"#1a1b22"}}>
                       {predEntrants.map(p=>{
                         const pick = (pred.picks[p]||{})[q.id];
                         if(!pick) return null;
@@ -1435,16 +1355,16 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                           const norm = v=>v.includes('-')?v.split('-').map(Number).sort((a,b)=>a-b).join('-'):v.toLowerCase().trim();
                           correct = norm(ans)===norm(pick);
                         }
-                        const borderCol = correct===true?'#a8e031':correct===false?'#E61D25':'#1e1f26';
-                        const bgCol = correct===true?'#0a150a':correct===false?'#150808':'#13141a';
+                        const borderCol = correct===true?'#a8e031':correct===false?'#E61D25':'transparent';
+                        const bgCol = correct===true?'rgba(168,224,49,0.06)':correct===false?'rgba(230,29,37,0.06)':'#13141a';
                         return (
-                          <div key={p} style={{background:bgCol,border:'1px solid '+borderCol,borderRadius:2,padding:'3px 8px',display:'flex',flexDirection:'column'}}>
+                          <div key={p} style={{background:bgCol,borderLeft:`2px solid ${borderCol}`,padding:'8px 10px',display:'flex',flexDirection:'column',gap:3}}>
                             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                              <span style={{fontSize:8,color:'#555',letterSpacing:1,textTransform:'uppercase',fontWeight:700}}>{p}</span>
-                              {correct===true&&<span style={{fontSize:8,color:'#a8e031',fontWeight:700}}>✓</span>}
-                              {correct===false&&<span style={{fontSize:8,color:'#E61D25',fontWeight:700}}>✗</span>}
+                              <span style={S.overviewPlayerName}>{p.toUpperCase()}</span>
+                              {correct===true&&<span style={{fontSize:8,color:'#a8e031',fontWeight:700,letterSpacing:1}}>✓</span>}
+                              {correct===false&&<span style={{fontSize:8,color:'#E61D25',fontWeight:700,letterSpacing:1}}>✗</span>}
                             </div>
-                            <span style={{fontSize:12,color:'#fff',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:0.5,marginTop:1}}>{q.type==='nation'?(FLAG[pick]||'🏳️')+' ':''}{pick}</span>
+                            <span style={S.overviewPickValue}>{q.type==='nation'?(FLAG[pick]||'🏳️')+' ':''}{pick}</span>
                           </div>
                         );
                       })}
@@ -1459,8 +1379,8 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
 
       {/* No player selected prompt */}
       {!adminMode&&!selectedPlayer&&!pred.locked&&(
-        <div style={{padding:"20px 0",textAlign:"center",color:"#444",fontSize:12,letterSpacing:1}}>
-          ↑ SELECT YOUR NAME ABOVE TO MAKE YOUR PICKS
+        <div style={{padding:"24px 0",textAlign:"center",color:"#333",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",fontWeight:700}}>
+          Select your name above to make your picks
         </div>
       )}
 
@@ -1486,14 +1406,13 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                   hasAnswer&&playerPick&&!isCorrect?{borderLeft:"3px solid #e53935",background:"#1a0808"}:{}),
               }}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                     {q.pts>0&&<span style={S.predPtsBadge}>{q.pts}pts</span>}
-                    <span style={{fontSize:12,color:"#e5e7eb",fontWeight:600}}>{q.label}</span>
+                    <span style={{fontSize:12,color:"#e5e7eb",fontWeight:600,fontFamily:"'DM Sans',sans-serif"}}>{q.label}</span>
                     {isCorrect&&<span style={{color:"#a8e031",fontSize:12}}>✓</span>}
                     {hasAnswer&&playerPick&&!isCorrect&&<span style={{color:"#e53935",fontSize:12}}>✗</span>}
                   </div>
 
-                  {/* Player pick input — shown when unlocked and not in admin mode */}
                   {!adminMode&&!pred.locked&&(
                     q.id==="tiebreak"
                       ? <TiebreakerInput
@@ -1505,17 +1424,14 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                       : <PredictorInput q={q} value={playerPick}
                           onChange={v=>setPredictorPick(selectedPlayer, q.id, v)}/>
                   )}
-                  {/* Show pick when locked */}
                   {!adminMode&&pred.locked&&playerPick&&<PredPickResult
                     pick={playerPick} qId={q.id} qType={q.type}
                     answers={pred.answers} overrides={pred.overrides}
                     player={selectedPlayer}
                   />}
-                  {/* Admin: show all players' picks + set correct answer */}
                   {adminMode&&(
                     <div style={{marginTop:4}}>
                       {q.type==="freetext" ? (
-                        // Freetext: show each player's answer with tick/cross override
                         <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:6}}>
                           {state.players.map(p=>{
                             const pp = (pred.picks[p]||{})[q.id];
@@ -1523,7 +1439,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                             const ov = (pred.overrides||{})[q.id]?.[p];
                             return (
                               <div key={p} style={{display:"flex",alignItems:"center",gap:8,background:"#1a1b22",borderRadius:3,padding:"5px 10px"}}>
-                                <span style={{fontSize:11,color:"#E61D25",fontWeight:700,minWidth:60}}>{p}</span>
+                                <span style={{fontSize:9,fontWeight:700,color:"#888",letterSpacing:2,textTransform:"uppercase",minWidth:60,fontFamily:"'DM Sans',sans-serif"}}>{p}</span>
                                 <span style={{fontSize:11,color:"#ccc",flex:1}}>{pp}</span>
                                 <button onClick={()=>setPredictorOverride(q.id,p,ov===true?null:true)}
                                   style={{background:ov===true?"#a8e031":"transparent",border:"1px solid",borderColor:ov===true?"#a8e031":"#333",color:ov===true?"#080808":"#444",borderRadius:2,padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:700}}>✓</button>
@@ -1534,12 +1450,16 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                           })}
                         </div>
                       ) : (
-                        // Non-freetext: show picks summary
                         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
                           {state.players.map(p=>{
                             const pp = (pred.picks[p]||{})[q.id];
                             if (!pp) return null;
-                            return <span key={p} style={{fontSize:10,color:"#9ca3af",background:"#1a1b22",borderRadius:4,padding:"1px 6px"}}><strong style={{color:"#E61D25"}}>{p}:</strong> {pp}</span>;
+                            return (
+                              <span key={p} style={{fontSize:10,color:"#9ca3af",background:"#1a1b22",borderRadius:4,padding:"2px 8px",display:"flex",alignItems:"center",gap:5}}>
+                                <strong style={{fontSize:8,color:"#888",letterSpacing:1.5,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"}}>{p}</strong>
+                                <span style={{color:"#ccc"}}>{pp}</span>
+                              </span>
+                            );
                           })}
                         </div>
                       )}
@@ -1548,7 +1468,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                         placeholder="Set correct answer…"/>
                     </div>
                   )}
-                  {hasAnswer&&<div style={{fontSize:10,color:"#6b7280",marginTop:2}}>✓ Answer: <strong style={{color:"#a8e031",fontWeight:600}}>{correctAnswer}</strong></div>}
+                  {hasAnswer&&<div style={{fontSize:10,color:"#555",marginTop:4}}>Answer: <strong style={{color:"#a8e031",fontWeight:600}}>{correctAnswer}</strong></div>}
                 </div>
               </div>
             );
@@ -1562,17 +1482,17 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
         .filter(p=>predEntrants.includes(p))
         .sort((a,b)=>scores[b]-scores[a])
         .map((p,i)=>(
-        <div key={p} style={{...S.lbRow,...S.lbRowAlive,marginBottom:4}}>
+        <div key={p} style={{...S.lbRow,marginBottom:1,background:"#13141a",padding:"12px 0"}}>
           <span style={S.lbRank}>{i+1}</span>
-          <span style={S.lbName}>{p}</span>
-          <span style={{fontSize:11,color:"#6b7280"}}>{scores[p]}/{maxPts} pts</span>
-          <div style={{marginLeft:"auto",background:"#E61D25",borderRadius:2,padding:"3px 10px",fontSize:11,color:"#fff",fontWeight:400,letterSpacing:1,fontFamily:"'Bebas Neue',sans-serif",fontWeight:700}}>
+          <span style={{...S.pickPlayerName,fontSize:11,letterSpacing:2}}>{p.toUpperCase()}</span>
+          <span style={{fontSize:10,color:"#444",marginLeft:8}}>{scores[p]}/{maxPts} pts</span>
+          <div style={{marginLeft:"auto",background:"#E61D25",borderRadius:2,padding:"3px 12px",fontSize:14,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2}}>
             {scores[p]}
           </div>
         </div>
       ))}
       {predEntrants.length===0&&(
-        <p style={{fontSize:12,color:"#6b7280",fontStyle:"italic",fontFamily:"'DM Sans',sans-serif"}}>No entries yet — pick your player above and start predicting!</p>
+        <p style={{fontSize:11,color:"#444",fontStyle:"italic",fontFamily:"'DM Sans',sans-serif",padding:"8px 0"}}>No entries yet — select your name above to start predicting.</p>
       )}
     </div>
   );
@@ -1592,10 +1512,11 @@ function PredPickResult({ pick, qId, qType, answers, overrides, player }) {
     correct = norm(ans)===norm(pick);
   }
   return (
-    <div style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"#9ca3af"}}>
-      <span>Your pick: <strong style={{color:"#fff"}}>{pick}</strong></span>
-      {correct===true&&<span style={{fontSize:9,fontWeight:700,color:"#a8e031",background:"rgba(168,224,49,0.12)",padding:"1px 6px",borderRadius:2,letterSpacing:1}}>✓ CORRECT</span>}
-      {correct===false&&<span style={{fontSize:9,fontWeight:700,color:"#E61D25",background:"rgba(230,29,37,0.12)",padding:"1px 6px",borderRadius:2,letterSpacing:1}}>✗ WRONG</span>}
+    <div style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"#9ca3af",marginTop:2}}>
+      <span style={{color:"#666"}}>Your pick:</span>
+      <strong style={{color:"#fff",fontFamily:"'DM Sans',sans-serif"}}>{pick}</strong>
+      {correct===true&&<span style={{fontSize:9,fontWeight:700,color:"#a8e031",background:"rgba(168,224,49,0.1)",padding:"1px 7px",borderRadius:2,letterSpacing:1}}>✓ CORRECT</span>}
+      {correct===false&&<span style={{fontSize:9,fontWeight:700,color:"#E61D25",background:"rgba(230,29,37,0.1)",padding:"1px 7px",borderRadius:2,letterSpacing:1}}>✗ WRONG</span>}
     </div>
   );
 }
@@ -1625,7 +1546,6 @@ function LMSTiebreakerInput({ value, takenValues, onCommit }) {
 
 function TiebreakerInput({ value, takenValues, onCommit }) {
   const [local, setLocal] = useState(value||"");
-  // Sync if external value changes (e.g. different player selected)
   useEffect(()=>{ setLocal(value||""); }, [value]);
   const isTaken = local && takenValues.includes(local) && local !== value;
   return (
@@ -1656,7 +1576,6 @@ function PredictorInput({ q, value, onChange, placeholder }) {
     </select>
   );
   if (q.type === "score") {
-    // Parse "H-A" — default both sides to "0" once user starts selecting
     const parts = (value||"").split("-");
     const home = parts.length >= 2 ? parts[0] : "";
     const away = parts.length >= 2 ? parts[1] : "";
@@ -1760,7 +1679,7 @@ function SettingsTab({ state, update, newPlayerName, setNewPlayerName, addPlayer
       <div style={S.infoBox}>
         <strong style={{color:"#E61D25"}}>🌐 Live & Shared</strong>
         <p style={{margin:"6px 0 0",fontSize:12,color:"#9ca3af",lineHeight:1.5}}>
-          Share this artifact&apos;s URL in your WhatsApp group. All picks and results sync within ~5 seconds for everyone.
+          Share this URL in your WhatsApp group. All picks and results sync within ~5 seconds for everyone.
         </p>
       </div>
       <div style={S.settingGroup}>
@@ -1794,7 +1713,6 @@ const S = {
   loadScreen:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0e0f14"},
   spinner:{width:36,height:36,border:"2px solid #1e1f26",borderTop:"2px solid #E61D25",borderRadius:"50%"},
 
-  // ── Header ────────────────────────────────────────────────────────────────
   header:{background:"#0e0f14",flexShrink:0,zIndex:100,borderBottom:"3px solid #E61D25"},
   headerTop:{display:"flex",alignItems:"center",gap:14,padding:"18px 18px 14px"},
   kicker:{fontSize:9,letterSpacing:4,color:"#E61D25",fontWeight:700,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",marginBottom:6},
@@ -1808,23 +1726,19 @@ const S = {
   statValue:{fontSize:18,fontFamily:"'Bebas Neue',sans-serif",color:"#fff",letterSpacing:1,lineHeight:1},
   statDivider:{width:1,height:28,background:"#2a2a2a",margin:"0 16px"},
 
-  // ── Game tabs ─────────────────────────────────────────────────────────────
   gameTabs:{display:"flex",overflowX:"auto",padding:"0 16px",gap:0,background:"#0e0f14",borderBottom:"1px solid #141414"},
   gameTab:{background:"transparent",border:"none",borderBottom:"2px solid transparent",color:"#3a3b45",padding:"9px 12px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap",fontWeight:600,letterSpacing:1.5,textTransform:"uppercase"},
   gameTabActive:{color:"#E61D25",borderBottom:"2px solid #E61D25"},
 
-  // ── Nav ───────────────────────────────────────────────────────────────────
   nav:{display:"flex",background:"#0b0c10",borderBottom:"1px solid #141414"},
   navBtn:{flex:1,padding:"11px 0",background:"transparent",border:"none",color:"#666",fontFamily:"'DM Sans',sans-serif",fontSize:9,letterSpacing:2.5,cursor:"pointer",textTransform:"uppercase",fontWeight:700,borderBottom:"3px solid transparent"},
   navBtnActive:{color:"#fff",borderBottom:"3px solid #E61D25",background:"#0d0d0d"},
 
   main:{padding:"14px 14px",maxWidth:900,margin:"0 auto",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},
 
-  // ── Banners ───────────────────────────────────────────────────────────────
   winnerBanner:{display:"flex",alignItems:"center",gap:18,background:"#E61D25",padding:"18px 20px",marginBottom:14,borderRadius:3},
   rolloverBanner:{background:"#13141a",borderLeft:"3px solid #a8e031",padding:"10px 14px",marginBottom:10,fontSize:10,color:"#a8e031",letterSpacing:2,textTransform:"uppercase",fontWeight:700},
 
-  // ── Round cards ───────────────────────────────────────────────────────────
   roundCard:{background:"#13141a",borderRadius:3,marginBottom:10,overflow:"hidden",border:"1px solid #1e1f26"},
   roundCardResolved:{opacity:0.45},
   roundHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid #1e1f26",cursor:"pointer",gap:8},
@@ -1837,7 +1751,6 @@ const S = {
   editBtn:{background:"transparent",border:"1px solid #1e1f26",color:"#3a3b45",borderRadius:2,padding:"4px 12px",cursor:"pointer",fontSize:8,letterSpacing:2.5,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
   closeRoundBtn:{background:"transparent",border:"1px solid #E61D25",color:"#E61D25",borderRadius:2,padding:"4px 12px",cursor:"pointer",fontSize:8,letterSpacing:2,fontFamily:"'DM Sans',sans-serif",fontWeight:700,textTransform:"uppercase"},
 
-  // ── Pick grid ─────────────────────────────────────────────────────────────
   picksGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,background:"#1e1f26"},
   pickCell:{background:"#0f0f0f",padding:"6px 12px 8px"},
   pickCellWin:{background:"#0f0f0f",borderLeft:"3px solid #a8e031"},
@@ -1845,7 +1758,7 @@ const S = {
   pickCellGhost:{background:"#0f0f0f"},
   pickCellSatOut:{background:"#0f0f0f"},
   pickPlayer:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7},
-  pickPlayerName:{fontSize:9,fontWeight:700,color:"#888",letterSpacing:2,textTransform:"uppercase",marginBottom:1},
+  pickPlayerName:{fontSize:9,fontWeight:700,color:"#888",letterSpacing:2,textTransform:"uppercase",marginBottom:1,fontFamily:"'DM Sans',sans-serif"},
   elimBadge:{fontSize:7,background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 5px",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"},
   pickSelect:{width:"100%",background:"transparent",border:"1px solid #2a2a2a",color:"#fff",borderRadius:2,padding:"5px 8px",fontSize:14,outline:"none",marginBottom:0,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1},
   pickDisplay:{fontSize:14,color:"#fff",marginBottom:0,minHeight:22,fontWeight:600},
@@ -1853,7 +1766,6 @@ const S = {
   outcomeBtn:{flex:1,padding:"5px 0",background:"transparent",border:"1px solid #1e1f26",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.5,transition:"all 0.1s",fontFamily:"'DM Sans',sans-serif"},
   resultBar:{padding:"9px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26",color:"#a8e031",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontWeight:700},
 
-  // ── Fixtures ──────────────────────────────────────────────────────────────
   fixtureSection:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,marginBottom:10,overflow:"hidden",width:"100%"},
   fixtureSectionHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"13px 16px",cursor:"pointer",gap:8,borderBottom:"1px solid #1e1f26"},
   fixtureSectionTitle:{fontSize:18,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},
@@ -1864,10 +1776,8 @@ const S = {
   fixtureTeam:{fontSize:13,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},
   fixtureVs:{fontSize:9,color:"#333",textAlign:"center",fontWeight:700,letterSpacing:1},
 
-  // ── Section titles ────────────────────────────────────────────────────────
   sectionTitle:{fontSize:26,fontWeight:400,color:"#fff",marginBottom:14,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,textTransform:"uppercase",display:"block",borderBottom:"1px solid #1e1f26",paddingBottom:10},
 
-  // ── Money tracker ─────────────────────────────────────────────────────────
   moneyRow:{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",marginBottom:1,background:"#13141a",borderBottom:"1px solid #1a1b22"},
   moneyRowUp:{borderLeft:"3px solid #a8e031"},
   moneyRowEven:{borderLeft:"3px solid #1e1f26"},
@@ -1879,13 +1789,11 @@ const S = {
   moneyGameBlock:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,marginBottom:8,overflow:"hidden"},
   moneyGameHeader:{padding:"12px 16px",borderBottom:"1px solid #1e1f26",display:"flex",flexDirection:"column",gap:4},
 
-  // ── Rules ─────────────────────────────────────────────────────────────────
   rules:{},
   ruleRow:{display:"flex",gap:14,padding:"12px 0",borderBottom:"1px solid #1a1b22",alignItems:"flex-start"},
   ruleNum:{width:24,height:24,background:"#E61D25",color:"#fff",borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0},
   ruleText:{fontSize:12,color:"#666",lineHeight:1.7},
 
-  // ── Settings ──────────────────────────────────────────────────────────────
   settings:{},
   infoBox:{background:"#13141a",borderLeft:"3px solid #E61D25",padding:"14px 16px",marginBottom:14},
   settingGroup:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,padding:"16px",marginBottom:10},
@@ -1897,9 +1805,18 @@ const S = {
 
   // ── Predictor ─────────────────────────────────────────────────────────────
   predHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:16},
-  predCatHeader:{fontSize:8,letterSpacing:4,color:"#3a3b45",padding:"14px 0 8px",borderBottom:"1px solid #1e1f26",marginBottom:10,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
-  predRow:{background:"#13141a",borderBottom:"1px solid #1a1b22",padding:"14px 0",marginBottom:0},
-  predPtsBadge:{background:"#E61D25",color:"#fff",borderRadius:2,padding:"3px 8px",fontSize:8,fontWeight:700,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
+  predCatHeader:{fontSize:8,letterSpacing:3,color:"#444",padding:"14px 0 8px",borderBottom:"1px solid #1e1f26",marginBottom:10,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
+  predRow:{background:"#13141a",borderBottom:"1px solid #1a1b22",padding:"12px 0",borderLeft:"3px solid transparent"},
+  predPtsBadge:{background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 7px",fontSize:8,fontWeight:700,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
+
+  // Player selector buttons — match tracker pickPlayerName style
+  predPlayerBtn:{padding:"5px 12px",borderRadius:2,border:"1px solid",cursor:"pointer",fontSize:9,fontFamily:"'DM Sans',sans-serif",letterSpacing:2,fontWeight:700,textTransform:"uppercase",transition:"all 0.1s"},
+
+  // Overview cards
+  overviewCatHeader:{fontSize:8,letterSpacing:3,color:"#444",fontWeight:700,textTransform:"uppercase",marginBottom:8,paddingBottom:6,borderBottom:"1px solid #1a1b22",fontFamily:"'DM Sans',sans-serif"},
+  overviewQLabel:{fontSize:10,color:"#555",marginBottom:1,letterSpacing:0.5,fontFamily:"'DM Sans',sans-serif",paddingBottom:4},
+  overviewPlayerName:{fontSize:8,fontWeight:700,color:"#555",letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
+  overviewPickValue:{fontSize:16,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,lineHeight:1.1},
 
   // ── Leaderboard ───────────────────────────────────────────────────────────
   lbRow:{display:"flex",alignItems:"center",gap:12,padding:"14px 0",borderBottom:"1px solid #1a1b22"},
@@ -1912,6 +1829,5 @@ const S = {
   lbStat:{fontSize:10,color:"#333",minWidth:48,textAlign:"right"},
   lbPot:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:18,padding:"16px 18px",background:"#E61D25",borderRadius:3},
 
-  // ── Toast ─────────────────────────────────────────────────────────────────
   toast:{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#fff",color:"#080808",padding:"10px 24px",borderRadius:2,fontWeight:700,letterSpacing:3,fontSize:10,zIndex:999,boxShadow:"0 8px 40px rgba(0,0,0,0.7)",whiteSpace:"nowrap",textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
 };
