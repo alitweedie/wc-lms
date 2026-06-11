@@ -1056,9 +1056,9 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                           })}
                         </select>
                       ):(
-                        <div style={{...S.pickDisplay, ...(deadlinePassed&&!resolved?{opacity:0.7}:{})}}>
+                        <div style={S.pickDisplay}>
                           {pick?(
-                            <span>
+                            <span style={{color:"#fff"}}>
                               {FLAG[pick]||"🏳️"} <strong>{pick}</strong>
                               {deadlinePassed&&!resolved&&<span style={{marginLeft:6,fontSize:8,color:"#E61D25",letterSpacing:1,fontWeight:700,textTransform:"uppercase"}}>🔒 LOCKED</span>}
                             </span>
@@ -1747,7 +1747,7 @@ const S = {
   pickPlayerName:{fontSize:11,fontWeight:700,color:"#fff",letterSpacing:1,textTransform:"uppercase"},
   elimBadge:{fontSize:7,background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 5px",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"},
   pickSelect:{width:"100%",background:"#1a1b22",border:"1px solid #1e1f26",color:"#ccc",borderRadius:2,padding:"5px 7px",fontSize:11,outline:"none",marginBottom:4},
-  pickDisplay:{fontSize:12,color:"#777",marginBottom:4,minHeight:20},
+  pickDisplay:{fontSize:12,color:"#ccc",marginBottom:4,minHeight:20},
   outcomeRow:{display:"flex",gap:4,marginTop:2},
   outcomeBtn:{flex:1,padding:"5px 0",background:"transparent",border:"1px solid #1e1f26",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.5,transition:"all 0.1s",fontFamily:"'DM Sans',sans-serif"},
   resultBar:{padding:"9px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26",color:"#a8e031",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontWeight:700},
