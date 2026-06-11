@@ -1037,9 +1037,14 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                 <div key={player} style={cellStyle}>
                   <div style={S.pickPlayer}>
                     <span style={S.pickPlayerName}>{player}</span>
-                    {satOut&&<span style={{...S.elimBadge,background:"#1e3a2f",color:"#6ee7b7"}}>SAT OUT</span>}
-                    {!satOut&&!isAlive&&elimMap[player]&&elimMap[player]>0&&
-                      <span style={S.elimBadge}>OUT R{elimMap[player]}</span>}
+                    <span style={{display:"flex",alignItems:"center",gap:4}}>
+                      {outcome===OUTCOME.WIN&&<span style={{fontSize:9,fontWeight:700,color:"#a8e031",letterSpacing:1,background:"rgba(168,224,49,0.12)",padding:"1px 6px",borderRadius:2}}>WIN</span>}
+                      {outcome===OUTCOME.DRAW&&<span style={{fontSize:9,fontWeight:700,color:"#E61D25",letterSpacing:1,background:"rgba(230,29,37,0.12)",padding:"1px 6px",borderRadius:2}}>DRAW</span>}
+                      {outcome===OUTCOME.LOSE&&<span style={{fontSize:9,fontWeight:700,color:"#E61D25",letterSpacing:1,background:"rgba(230,29,37,0.12)",padding:"1px 6px",borderRadius:2}}>OUT</span>}
+                      {satOut&&<span style={{fontSize:9,fontWeight:700,color:"#444",letterSpacing:1}}>SAT OUT</span>}
+                      {!satOut&&!isAlive&&!outcome&&elimMap[player]&&elimMap[player]>0&&
+                        <span style={S.elimBadge}>OUT R{elimMap[player]}</span>}
+                    </span>
                   </div>
 
                   {satOut?(
@@ -1737,9 +1742,9 @@ const S = {
   closeRoundBtn:{background:"transparent",border:"1px solid #E61D25",color:"#E61D25",borderRadius:2,padding:"4px 12px",cursor:"pointer",fontSize:8,letterSpacing:2,fontFamily:"'DM Sans',sans-serif",fontWeight:700,textTransform:"uppercase"},
 
   // ── Pick grid ─────────────────────────────────────────────────────────────
-  picksGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:1,background:"#1e1f26"},
+  picksGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,background:"#1e1f26"},
   pickCell:{background:"#13141a",padding:"12px 14px"},
-  pickCellWin:{background:"#0a1a0a",borderLeft:"3px solid #a8e031"},
+  pickCellWin:{background:"#0a150a",borderLeft:"4px solid #a8e031"},
   pickCellElim:{background:"#1a0a0a",borderLeft:"3px solid #E61D25"},
   pickCellGhost:{opacity:0.15,background:"#0e0f14"},
   pickCellSatOut:{opacity:0.2,background:"#0b0c10"},
@@ -1747,7 +1752,7 @@ const S = {
   pickPlayerName:{fontSize:11,fontWeight:700,color:"#fff",letterSpacing:1,textTransform:"uppercase"},
   elimBadge:{fontSize:7,background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 5px",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"},
   pickSelect:{width:"100%",background:"#1a1b22",border:"1px solid #1e1f26",color:"#ccc",borderRadius:2,padding:"5px 7px",fontSize:11,outline:"none",marginBottom:4},
-  pickDisplay:{fontSize:12,color:"#ccc",marginBottom:4,minHeight:20},
+  pickDisplay:{fontSize:14,color:"#fff",marginBottom:0,minHeight:22,fontWeight:600},
   outcomeRow:{display:"flex",gap:4,marginTop:2},
   outcomeBtn:{flex:1,padding:"5px 0",background:"transparent",border:"1px solid #1e1f26",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.5,transition:"all 0.1s",fontFamily:"'DM Sans',sans-serif"},
   resultBar:{padding:"9px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26",color:"#a8e031",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontWeight:700},
