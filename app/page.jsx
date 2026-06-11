@@ -1061,16 +1061,16 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                           })}
                         </select>
                       ):(
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:44,paddingTop:2}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:36,paddingTop:2}}>
                           {pick?(
                             <>
-                              <span style={{fontSize:14,fontWeight:700,color:"#fff"}}>{pick}</span>
-                              <span style={{fontSize:40,lineHeight:1}}>{FLAG[pick]||"🏳️"}</span>
+                              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:1,color:"#fff",lineHeight:1}}>{pick}</span>
+                              <span style={{fontSize:28,lineHeight:1}}>{FLAG[pick]||"🏳️"}</span>
                             </>
                           ):deadlinePassed&&!resolved?(
-                            <span style={{color:"#E61D25",fontSize:10,fontWeight:700,letterSpacing:1}}>⏰ NO PICK</span>
+                            <span style={{color:"#E61D25",fontSize:9,fontWeight:700,letterSpacing:1}}>⏰ NO PICK</span>
                           ):(
-                            <span style={{color:"#555",fontStyle:"italic",fontSize:12}}>No pick</span>
+                            <span style={{color:"#555",fontStyle:"italic",fontSize:11}}>No pick</span>
                           )}
                         </div>
                       )}
@@ -1087,14 +1087,14 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                       )}
                     </>
                   ):(
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:44,paddingTop:2}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:36,paddingTop:2}}>
                       {pick?(
                         <>
-                          <span style={{fontSize:14,fontWeight:700,color:"#fff"}}>{pick}</span>
-                          <span style={{fontSize:40,lineHeight:1}}>{FLAG[pick]||"🏳️"}</span>
+                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:1,color:"#fff",lineHeight:1}}>{pick}</span>
+                          <span style={{fontSize:28,lineHeight:1}}>{FLAG[pick]||"🏳️"}</span>
                         </>
                       ):(
-                        <span style={{color:"#333",fontStyle:"italic",fontSize:12}}>no pick</span>
+                        <span style={{color:"#333",fontStyle:"italic",fontSize:11}}>no pick</span>
                       )}
                     </div>
                   )}
