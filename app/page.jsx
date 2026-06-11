@@ -1301,7 +1301,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                   color: selectedPlayer===null?"#fff":"#555",
                   borderColor: selectedPlayer===null?"#E61D25":"#252525",
                 }}>
-                📋 OVERVIEW
+                OVERVIEW
               </button>
             )}
             {state.players.map(p=>(
