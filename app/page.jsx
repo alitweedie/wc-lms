@@ -1376,6 +1376,18 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
       {!adminMode&&(
         <div style={{padding:"8px 0 12px"}}>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {pred.locked&&(
+              <button onClick={()=>setSelectedPlayer(null)}
+                style={{
+                  padding:"5px 12px",borderRadius:20,border:"1px solid",cursor:"pointer",fontSize:12,
+                  fontFamily:"'Oswald',sans-serif",letterSpacing:1,
+                  background: selectedPlayer===null?"#E61D25":"transparent",
+                  color: selectedPlayer===null?"#fff":"#9ca3af",
+                  borderColor: selectedPlayer===null?"#E61D25":"#1c1c1c",
+                }}>
+                📋 OVERVIEW
+              </button>
+            )}
             {state.players.map(p=>(
               <button key={p} onClick={()=>setSelectedPlayer(p)}
                 style={{
@@ -1397,6 +1409,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
       {!adminMode&&!selectedPlayer&&pred.locked&&(
         <div style={{marginBottom:16}}>
           <div style={{fontSize:9,letterSpacing:3,color:"#E61D25",fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Everyone's Picks</div>
+          {predEntrants.length===0&&<div style={{color:"#444",fontSize:11,padding:"8px 0"}}>No picks submitted yet.</div>}
           {cats.filter(c=>c!=="Tiebreaker").map(cat=>{
             const qs = PREDICTOR_QUESTIONS.filter(q=>q.cat===cat&&q.id!=="tiebreak");
             if(!qs.length) return null;
@@ -1413,7 +1426,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                         return (
                           <div key={p} style={{background:"#13141a",border:"1px solid #1e1f26",borderRadius:2,padding:"3px 8px",display:"flex",flexDirection:"column",minWidth:70}}>
                             <span style={{fontSize:8,color:"#555",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>{p}</span>
-                            <span style={{fontSize:12,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:0.5,marginTop:1}}>{FLAG[pick]||""} {pick}</span>
+                            <span style={{fontSize:12,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:0.5,marginTop:1}}>{q.type==="nation"?(FLAG[pick]||"🏳️")+" ":""}{pick}</span>
                           </div>
                         );
                       })}
