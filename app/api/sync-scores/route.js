@@ -1,3 +1,5 @@
+// v2
+
 // Place at: app/api/sync-scores/route.js
 
 export const dynamic = "force-dynamic";
