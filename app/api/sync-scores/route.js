@@ -9,7 +9,26 @@
 
 export const dynamic = "force-dynamic";
 
+import { Redis } from "@upstash/redis";
 import { toTrackerLabel } from "../test-scores/route";
+
+// ── Redis (matches your existing /api/state/route.js exactly) ────────────────
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
+
+const KEY = "wc_lms_state";
+
+async function loadState() {
+  const data = await redis.get(KEY);
+  return data || null;
+}
+
+async function saveState(state) {
+  state.lastUpdated = Date.now();
+  await redis.set(KEY, state);
+}
 
 // ── Shared constants (mirrors page.jsx) ──────────────────────────────────────
 const OUTCOME = { WIN: "win", LOSE: "lose", DRAW: "draw", PENDING: "" };
@@ -25,28 +44,6 @@ const ROUNDS = [
   { id:7, stage:"Semi-Finals" },
   { id:8, stage:"Final" },
 ];
-
-// ── Redis helpers (same pattern as your existing /api/state route) ───────────
-async function loadState() {
-  const res = await fetch(process.env.KV_REST_API_URL + "/get/wc-lms-state", {
-    headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` },
-    cache: "no-store",
-  });
-  const { result } = await res.json();
-  return result ? JSON.parse(result) : null;
-}
-
-async function saveState(state) {
-  state.lastUpdated = Date.now();
-  await fetch(process.env.KV_REST_API_URL + "/set/wc-lms-state", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ value: JSON.stringify(state) }),
-  });
-}
 
 // ── State helpers (mirrors page.jsx logic) ───────────────────────────────────
 function roundResolved(round) {
@@ -80,8 +77,8 @@ function getAliveAtStart(game, players, roundIndex) {
       if (elim[p]) continue;
       const pick = r.picks[p];
       const o    = r.outcomes[p];
-      if (i > 0 && !pick)                              { elim[p] = r.id; continue; }
-      if (o === OUTCOME.LOSE || o === OUTCOME.DRAW)    { elim[p] = r.id; }
+      if (i > 0 && !pick)                           { elim[p] = r.id; continue; }
+      if (o === OUTCOME.LOSE || o === OUTCOME.DRAW) { elim[p] = r.id; }
     }
   }
   return entrants.filter(p => !elim[p]);
@@ -103,12 +100,12 @@ function buildElimMap(game, players) {
     if (!entrants.includes(p)) { m[p] = -1; continue; }
     let eliminated = null;
     for (let i = 0; i < game.rounds.length; i++) {
-      const r = game.rounds[i];
+      const r    = game.rounds[i];
       if (!roundResolved(r)) break;
       const pick = r.picks[p];
       const o    = r.outcomes[p];
-      if (i > 0 && !pick)                              { eliminated = r.id; break; }
-      if (o === OUTCOME.LOSE || o === OUTCOME.DRAW)    { eliminated = r.id; break; }
+      if (i > 0 && !pick)                           { eliminated = r.id; break; }
+      if (o === OUTCOME.LOSE || o === OUTCOME.DRAW) { eliminated = r.id; break; }
     }
     if (eliminated !== null) m[p] = eliminated;
   }
@@ -134,13 +131,12 @@ function evaluateGameEnd(g, players) {
   }
   if (lastSettledIdx < 0) return;
 
-  const entrants  = gameEntrants(g, players);
-  const lastRound = g.rounds[lastSettledIdx];
+  const entrants     = gameEntrants(g, players);
+  const lastRound    = g.rounds[lastSettledIdx];
   const isFinalRound = lastSettledIdx === g.rounds.length - 1;
-
-  const survivors = entrants.filter(p => lastRound.outcomes[p] === OUTCOME.WIN);
-  const elimMap   = buildElimMap(g, players);
-  const alive     = entrants.filter(p => elimMap[p] == null);
+  const survivors    = entrants.filter(p => lastRound.outcomes[p] === OUTCOME.WIN);
+  const elimMap      = buildElimMap(g, players);
+  const alive        = entrants.filter(p => elimMap[p] == null);
 
   const aliveAtLast  = getAliveAtStart(g, players, lastSettledIdx);
   const roundPending = aliveAtLast.filter(p => {
@@ -155,7 +151,9 @@ function evaluateGameEnd(g, players) {
   if (!gameOver) return;
 
   g.complete = true;
-  g.winners  = survivors.length === 1 ? survivors : (isFinalRound && survivors.length > 0 ? survivors : []);
+  g.winners  = survivors.length === 1
+    ? survivors
+    : (isFinalRound && survivors.length > 0 ? survivors : []);
   if (survivors.length === 0) g.rolledOver = true;
 
   // Don't spawn a new game after the Final
@@ -169,150 +167,119 @@ function evaluateGameEnd(g, players) {
 }
 
 // ── Fetch finished WC matches from football-data.org ────────────────────────
-async function fetchFinishedMatches(key) {
+async function fetchFinishedMatches(apiKey) {
   const res = await fetch(
     "https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED",
-    { headers: { "X-Auth-Token": key }, cache: "no-store" }
+    { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
   );
   if (!res.ok) throw new Error(`football-data.org returned ${res.status}`);
   const data = await res.json();
   return (data.matches ?? []).map(m => ({
     homeLabel: toTrackerLabel(m.homeTeam?.name),
     awayLabel: toTrackerLabel(m.awayTeam?.name),
-    winner:    m.score?.winner,    // HOME_TEAM | AWAY_TEAM | DRAW
-    duration:  m.score?.duration,  // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
-    utcDate:   m.utcDate,
+    winner:    m.score?.winner,   // HOME_TEAM | AWAY_TEAM | DRAW
+    duration:  m.score?.duration, // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
   }));
 }
 
 // Build a lookup: "TeamA|TeamB" → { winner, duration }
-// Both orderings are stored so pick-lookup is order-independent.
+// Both orderings stored so pick-lookup is order-independent.
 function buildResultLookup(matches) {
   const lookup = {};
   for (const m of matches) {
     if (!m.homeLabel || !m.awayLabel) continue;
-    const key1 = `${m.homeLabel}|${m.awayLabel}`;
-    const key2 = `${m.awayLabel}|${m.homeLabel}`;
-    // Flip winner for the reversed key
-    const flippedWinner =
+    const flipped =
       m.winner === "HOME_TEAM" ? "AWAY_TEAM" :
       m.winner === "AWAY_TEAM" ? "HOME_TEAM" : m.winner;
-    lookup[key1] = { winner: m.winner,        duration: m.duration };
-    lookup[key2] = { winner: flippedWinner,   duration: m.duration };
+    lookup[`${m.homeLabel}|${m.awayLabel}`] = { winner: m.winner,  duration: m.duration };
+    lookup[`${m.awayLabel}|${m.homeLabel}`] = { winner: flipped,   duration: m.duration };
   }
   return lookup;
 }
 
-// For a player's pick (a single team label) and a result lookup,
-// return WIN | LOSE | DRAW | null (null = match not finished yet)
-function resolveOutcome(pickedTeam, roundFixtures, resultLookup, isKnockout) {
-  // Find the fixture in this round that involves the picked team
-  const fixture = roundFixtures.find(([h, a]) => h === pickedTeam || a === pickedTeam);
-  if (!fixture) return null; // team not in this round — shouldn't happen
+// Resolve a player's picked team against the result lookup.
+// Returns WIN | LOSE | DRAW | null (null = match not finished yet)
+function resolveOutcome(pick, resultLookup, isKnockout) {
+  // Find any lookup entry where pick is the home team (avoid double-counting)
+  for (const [key, result] of Object.entries(resultLookup)) {
+    const [home] = key.split("|");
+    if (home !== pick) continue;
 
-  const [home, away] = fixture;
-  const key = `${home}|${away}`;
-  const result = resultLookup[key];
-  if (!result) return null; // match not finished yet
+    const { winner, duration } = result;
 
-  const isHome = home === pickedTeam;
-  const { winner, duration } = result;
-
-  if (winner === "DRAW") {
-    // Knockout rounds: draws go to ET/pens, which always produce a winner
-    // so DRAW at full time in a knockout = check duration
-    if (isKnockout && (duration === "EXTRA_TIME" || duration === "PENALTY_SHOOTOUT")) {
-      // This shouldn't happen (API gives HOME_TEAM/AWAY_TEAM for ET/pens winners)
-      // but guard just in case
-      return null;
+    if (winner === "DRAW") {
+      // In knockouts the API still returns HOME_TEAM/AWAY_TEAM when ET/pens decide it,
+      // so a genuine DRAW here only occurs in the group stage.
+      if (isKnockout) return null; // shouldn't happen, but guard anyway
+      return OUTCOME.DRAW;
     }
-    return OUTCOME.DRAW;
-  }
 
-  const pickedWon = (winner === "HOME_TEAM" && isHome) || (winner === "AWAY_TEAM" && !isHome);
-  return pickedWon ? OUTCOME.WIN : OUTCOME.LOSE;
+    return winner === "HOME_TEAM" ? OUTCOME.WIN : OUTCOME.LOSE;
+  }
+  return null; // match not in finished results yet
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 export async function GET(request) {
-  const isDry = new URL(request.url).searchParams.get("dry") === "1";
+  const isDry      = new URL(request.url).searchParams.get("dry") === "1";
+  const apiKey     = process.env.FOOTBALL_DATA_API_KEY;
+  const cronSecret = process.env.CRON_SECRET;
+  const log        = [];
 
-  const key = process.env.FOOTBALL_DATA_API_KEY;
-  if (!key) {
-    return json({ error: "FOOTBALL_DATA_API_KEY env var not set" }, 500);
+  if (!apiKey) return json({ error: "FOOTBALL_DATA_API_KEY not set" }, 500);
+
+  // Protect the live endpoint from external callers.
+  // Dry-run is always allowed (read-only); live runs require the secret header
+  // that Vercel Cron sends automatically.
+  if (!isDry && cronSecret) {
+    const incoming = request.headers.get("x-cron-secret");
+    if (incoming !== cronSecret) return json({ error: "Unauthorised" }, 401);
   }
-
-  // Verify this is a legitimate cron call in production
-  // (Vercel sends this header; skip check in dev/dry-run)
-  const cronSecret  = request.headers.get("x-cron-secret");
-  const expectedSecret = process.env.CRON_SECRET;
-  if (!isDry && expectedSecret && cronSecret !== expectedSecret) {
-    return json({ error: "Unauthorised" }, 401);
-  }
-
-  const log = [];
 
   try {
-    // 1. Load state
+    // 1. Load state from Redis
     const state = await loadState();
     if (!state) return json({ error: "No state in Redis" }, 500);
 
-    // 2. Fetch finished matches
-    const finished = await fetchFinishedMatches(key);
-    log.push(`Fetched ${finished.length} finished matches from API`);
-
+    // 2. Fetch all finished matches and build lookup
+    const finished     = await fetchFinishedMatches(apiKey);
+    log.push(`Fetched ${finished.length} finished match(es) from API`);
     const resultLookup = buildResultLookup(finished);
 
-    // 3. Walk every active (incomplete) game
+    // 3. Walk every active game → every round → every alive player
     let totalChanges = 0;
 
     for (const game of state.games) {
       if (game.complete) continue;
 
       for (let rIdx = 0; rIdx < game.rounds.length; rIdx++) {
-        const round    = game.rounds[rIdx];
-        const wcRound  = ROUNDS.find(r => r.id === round.id);
+        const round   = game.rounds[rIdx];
+        const wcRound = ROUNDS.find(r => r.id === round.id);
         if (!wcRound) continue;
 
-        const isKnockout  = round.id >= 4;
+        const isKnockout   = round.id >= 4;
         const aliveAtStart = getAliveAtStart(game, state.players, rIdx);
-
-        // Get the fixture list for this round from the ROUNDS data in page.jsx.
-        // We need the actual fixture pairings. Rather than duplicating all fixtures
-        // here, we infer them from the result lookup — any match in the lookup
-        // involving a team that a player picked is the relevant fixture.
-        // The resolver works pick-by-pick: for each alive player with a PENDING
-        // outcome, look up their team in the results.
 
         for (const player of aliveAtStart) {
           const pick    = round.picks[player];
           const current = round.outcomes[player];
 
-          if (!pick) continue; // no pick yet — leave pending
+          if (!pick) continue; // no pick yet
           if (current === OUTCOME.WIN || current === OUTCOME.LOSE || current === OUTCOME.DRAW) {
-            continue; // already resolved
+            continue; // already resolved — never overwrite
           }
 
-          // Find the result for this player's picked team in this round.
-          // Look for any lookup key that starts with or ends with the picked team.
-          let outcome = null;
-          for (const [lookupKey, result] of Object.entries(resultLookup)) {
-            const [home, away] = lookupKey.split("|");
-            if (home !== pick) continue; // use the "home is pick" orientation only (avoid double-processing)
-            outcome = resolveOutcome(pick, [[home, away]], resultLookup, isKnockout);
-            if (outcome !== null) break;
-          }
-
+          const outcome = resolveOutcome(pick, resultLookup, isKnockout);
           if (outcome === null) continue; // match not finished yet
 
-          log.push(`${game.label} R${round.id} ${player} picked ${pick} → ${outcome}`);
+          log.push(`${game.label} R${round.id}: ${player} picked ${pick} → ${outcome}`);
           if (!isDry) {
             round.outcomes[player] = outcome;
             totalChanges++;
           }
         }
 
-        // After updating outcomes, check if the game should end
+        // Check whether this outcome update ended the game
         if (!isDry && totalChanges > 0) {
           const newGame = evaluateGameEnd(game, state.players);
           if (newGame) {
@@ -321,7 +288,7 @@ export async function GET(request) {
               newGame.id    = state.games.length + 1;
               newGame.label = `Game ${newGame.id}`;
               state.games.push(newGame);
-              log.push(`Game ended — spawned ${newGame.label} starting at round ${newGame.startRoundIdx + 1}`);
+              log.push(`Game ended — spawned ${newGame.label}`);
             }
           }
         }
@@ -331,14 +298,14 @@ export async function GET(request) {
     // 4. Save if anything changed
     if (!isDry && totalChanges > 0) {
       await saveState(state);
-      log.push(`Saved state (${totalChanges} outcome(s) updated)`);
+      log.push(`Saved — ${totalChanges} outcome(s) updated`);
     } else if (isDry) {
-      log.push("Dry run — no changes saved");
+      log.push("Dry run — nothing saved");
     } else {
       log.push("No new outcomes to update");
     }
 
-    return json({ ok: true, dry: isDry, changes: totalChanges, log }, 200);
+    return json({ ok: true, dry: isDry, changes: totalChanges, log });
 
   } catch (e) {
     log.push("Error: " + e.message);
