@@ -263,11 +263,13 @@ export async function GET(request) {
 
   if (!apiKey) return respond({ error: "FOOTBALL_DATA_API_KEY not set" }, 500);
 
-  if (!isDry && cronSecret) {
-    if (request.headers.get("x-cron-secret") !== cronSecret) {
-      return respond({ error: "Unauthorised" }, 401);
-    }
+  const isManual = url.searchParams.get("manual") === process.env.CRON_SECRET;
+if (!isDry && !isManual && cronSecret) {
+  if (request.headers.get("x-cron-secret") !== cronSecret) {
+    return respond({ error: "Unauthorised" }, 401);
   }
+}
+
 
   try {
     const state = await loadState();
