@@ -27,8 +27,10 @@ export const NAME_MAP = {
   "Côte d'Ivoire":          "Ivory Coast",
   "Cote d'Ivoire":          "Ivory Coast",
   "Congo DR":               "DR Congo",
+  "Cape Verde Islands":     "Cape Verde",
   "Cabo Verde":             "Cape Verde",
   "Czech Republic":         "Czechia",
+  "CuraÃ§ao":              "Curaçao",
   "Curacao":                "Curaçao",
 };
 
