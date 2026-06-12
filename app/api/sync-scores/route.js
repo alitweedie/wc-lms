@@ -1,7 +1,5 @@
 // Place at: app/api/sync-scores/route.js
 
-import { Redis } from "@upstash/redis";
-
 export const dynamic = "force-dynamic";
 
 // ── Team name mapping ─────────────────────────────────────────────────────────
@@ -39,10 +37,27 @@ function toTrackerLabel(apiName) {
   return null;
 }
 
+// ── State via your own /api/state route ──────────────────────────────────────
+// This avoids any Redis client issues by reusing the working endpoint.
+async function loadState(baseUrl) {
+  const res = await fetch(`${baseUrl}/api/state`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load state: ${res.status}`);
+  return res.json();
+}
+
+async function saveState(baseUrl, state) {
+  state.lastUpdated = Date.now();
+  const res = await fetch(`${baseUrl}/api/state`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(state),
+  });
+  if (!res.ok) throw new Error(`Failed to save state: ${res.status}`);
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 const OUTCOME = { WIN: "win", LOSE: "lose", DRAW: "draw", PENDING: "" };
 const ENTRY_FEE = 2;
-const KEY = "wc_lms_state";
 
 const ROUNDS = [
   { id:1, stage:"Group Stage" },
@@ -54,24 +69,6 @@ const ROUNDS = [
   { id:7, stage:"Semi-Finals" },
   { id:8, stage:"Final" },
 ];
-
-// ── Redis — instantiated lazily inside handler so env vars are always present ─
-function getRedis() {
-  return new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  });
-}
-
-async function loadState() {
-  const data = await getRedis().get(KEY);
-  return data || null;
-}
-
-async function saveState(state) {
-  state.lastUpdated = Date.now();
-  await getRedis().set(KEY, state);
-}
 
 // ── State helpers ─────────────────────────────────────────────────────────────
 function roundResolved(round) {
@@ -235,14 +232,14 @@ function resolveOutcome(pick, resultLookup, isKnockout) {
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function GET(request) {
-  const isDry      = new URL(request.url).searchParams.get("dry") === "1";
+  const url        = new URL(request.url);
+  const baseUrl    = `${url.protocol}//${url.host}`;
+  const isDry      = url.searchParams.get("dry") === "1";
   const apiKey     = process.env.FOOTBALL_DATA_API_KEY;
   const cronSecret = process.env.CRON_SECRET;
   const log        = [];
 
   if (!apiKey) return respond({ error: "FOOTBALL_DATA_API_KEY not set" }, 500);
-  if (!process.env.UPSTASH_REDIS_REST_URL) return respond({ error: "UPSTASH_REDIS_REST_URL not set" }, 500);
-  if (!process.env.UPSTASH_REDIS_REST_TOKEN) return respond({ error: "UPSTASH_REDIS_REST_TOKEN not set" }, 500);
 
   if (!isDry && cronSecret) {
     if (request.headers.get("x-cron-secret") !== cronSecret) {
@@ -251,8 +248,9 @@ export async function GET(request) {
   }
 
   try {
-    const state = await loadState();
+    const state = await loadState(baseUrl);
     if (!state) return respond({ error: "No state in Redis" }, 500);
+    log.push("State loaded successfully");
 
     const finished     = await fetchFinishedMatches(apiKey);
     log.push(`Fetched ${finished.length} finished match(es) from API`);
@@ -304,7 +302,7 @@ export async function GET(request) {
     }
 
     if (!isDry && totalChanges > 0) {
-      await saveState(state);
+      await saveState(baseUrl, state);
       log.push(`Saved — ${totalChanges} outcome(s) updated`);
     } else if (isDry) {
       log.push("Dry run — nothing saved");
