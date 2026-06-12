@@ -1,5 +1,3 @@
-// v2
-
 // Place at: app/api/sync-scores/route.js
 
 export const dynamic = "force-dynamic";
@@ -40,23 +38,18 @@ function toTrackerLabel(apiName) {
 }
 
 // ── Redis via plain fetch (no client library) ─────────────────────────────────
-// Talks directly to Upstash REST API — same thing @upstash/redis does
-// internally, but without any module-level initialisation that can crash.
 const KEY = "wc_lms_state";
 
 async function loadState() {
   const url   = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) throw new Error("Upstash env vars not set");
-
   const res = await fetch(`${url}/get/${KEY}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Redis GET failed: ${res.status}`);
   const { result } = await res.json();
-  // Upstash returns the value as a string if stored via @upstash/redis client,
-  // or as a parsed object if stored via REST. Handle both.
   if (!result) return null;
   return typeof result === "string" ? JSON.parse(result) : result;
 }
@@ -65,7 +58,6 @@ async function saveState(state) {
   const url   = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) throw new Error("Upstash env vars not set");
-
   state.lastUpdated = Date.now();
   const res = await fetch(`${url}/set/${KEY}`, {
     method: "POST",
@@ -226,6 +218,8 @@ async function fetchFinishedMatches(apiKey) {
     awayLabel: toTrackerLabel(m.awayTeam?.name),
     winner:    m.score?.winner,
     duration:  m.score?.duration,
+    homeGoals: m.score?.fullTime?.home ?? null,
+    awayGoals: m.score?.fullTime?.away ?? null,
   }));
 }
 
@@ -236,8 +230,14 @@ function buildResultLookup(matches) {
     const flipped =
       m.winner === "HOME_TEAM" ? "AWAY_TEAM" :
       m.winner === "AWAY_TEAM" ? "HOME_TEAM" : m.winner;
-    lookup[`${m.homeLabel}|${m.awayLabel}`] = { winner: m.winner,  duration: m.duration };
-    lookup[`${m.awayLabel}|${m.homeLabel}`] = { winner: flipped,   duration: m.duration };
+    lookup[`${m.homeLabel}|${m.awayLabel}`] = {
+      winner: m.winner, duration: m.duration,
+      homeGoals: m.homeGoals, awayGoals: m.awayGoals,
+    };
+    lookup[`${m.awayLabel}|${m.homeLabel}`] = {
+      winner: flipped, duration: m.duration,
+      homeGoals: m.awayGoals, awayGoals: m.homeGoals,
+    };
   }
   return lookup;
 }
@@ -278,6 +278,16 @@ export async function GET(request) {
     log.push(`Fetched ${finished.length} finished match(es) from API`);
     const resultLookup = buildResultLookup(finished);
 
+    // Update matchResults map in state (home|away -> { h, a })
+    // This is read by the fixtures tab to show scores.
+    if (!state.matchResults) state.matchResults = {};
+    for (const m of finished) {
+      if (!m.homeLabel || !m.awayLabel) continue;
+      if (m.homeGoals === null) continue;
+      const key = `${m.homeLabel}|${m.awayLabel}`;
+      state.matchResults[key] = { h: m.homeGoals, a: m.awayGoals };
+    }
+
     let totalChanges = 0;
 
     for (const game of state.games) {
@@ -301,7 +311,7 @@ export async function GET(request) {
           const outcome = resolveOutcome(pick, resultLookup, isKnockout);
           if (outcome === null) continue;
 
-          log.push(`${game.label} R${round.id}: ${player} picked ${pick} → ${outcome}`);
+          log.push(`${game.label} R${round.id}: ${player} picked ${pick} -> ${outcome}`);
           if (!isDry) {
             round.outcomes[player] = outcome;
             totalChanges++;
@@ -316,20 +326,24 @@ export async function GET(request) {
               newGame.id    = state.games.length + 1;
               newGame.label = `Game ${newGame.id}`;
               state.games.push(newGame);
-              log.push(`Game ended — spawned ${newGame.label}`);
+              log.push(`Game ended - spawned ${newGame.label}`);
             }
           }
         }
       }
     }
 
-    if (!isDry && totalChanges > 0) {
-      await saveState(state);
-      log.push(`Saved — ${totalChanges} outcome(s) updated`);
-    } else if (isDry) {
-      log.push("Dry run — nothing saved");
+    if (!isDry) {
+      // Always save if matchResults changed, even if no outcomes changed
+      const hasNewScores = finished.some(m => m.homeGoals !== null);
+      if (totalChanges > 0 || hasNewScores) {
+        await saveState(state);
+        log.push(`Saved - ${totalChanges} outcome(s) updated, scores stored`);
+      } else {
+        log.push("No changes to save");
+      }
     } else {
-      log.push("No new outcomes to update");
+      log.push("Dry run - nothing saved");
     }
 
     return respond({ ok: true, dry: isDry, changes: totalChanges, log });
