@@ -783,7 +783,7 @@ export default function App() {
             closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker}
             editingRound={editingRound} setEditingRound={setEditingRound}/>
         )}
-        {tab==="fixtures"&&<FixturesTab game={game} matchResults={state.matchResults||{}}/>}
+        {tab==="fixtures"&&<FixturesTab game={game} matchResults={state.matchResults||{}} fixtureOverrides={state.fixtureOverrides||{}}/>}
         {tab==="money"&&<MoneyTab state={state}/>}
         {tab==="predictor"&&(
           <PredictorTab
@@ -1098,7 +1098,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
 // ═══════════════════════════════════════════════════════════════════════════════
 // FIXTURES TAB
 // ═══════════════════════════════════════════════════════════════════════════════
-function FixturesTab({ game, matchResults }) {
+function FixturesTab({ game, matchResults, fixtureOverrides }) {
   const [openRound, setOpenRound] = useState(game.rounds[0]?.id||1);
   return (
     <div>
@@ -1108,8 +1108,10 @@ function FixturesTab({ game, matchResults }) {
         const wcRound=ROUNDS.find(r=>r.id===round.id);
         if (!wcRound) return null;
         const isOpen=openRound===round.id;
-        const finishedCount=wcRound.fixtures.filter(([h,a])=>matchResults[`${h}|${a}`]!==undefined).length;
-        const totalCount=wcRound.fixtures.length;
+        // Use API-synced fixtures if available, otherwise fall back to hardcoded
+        const fixtures = fixtureOverrides[round.id] || wcRound.fixtures || [];
+        const finishedCount=fixtures.filter(([h,a])=>matchResults[`${h}|${a}`]!==undefined).length;
+        const totalCount=fixtures.length;
         const allDone=finishedCount===totalCount&&totalCount>0;
         return (
           <div key={round.id} style={S.fixtureSection}>
@@ -1132,7 +1134,7 @@ function FixturesTab({ game, matchResults }) {
             </div>
             {isOpen&&(
               <div>
-                {wcRound.fixtures.map(([home,away,date,time],i)=>{
+                {fixtures.map(([home,away,date,time],i)=>{
                   const result=matchResults[`${home}|${away}`];
                   const hasScore=result!==undefined;
                   const homeWon=hasScore&&result.h>result.a;
@@ -1693,6 +1695,34 @@ function ResetPanel() {
 }
 
 function SettingsTab({ state, update, newPlayerName, setNewPlayerName, addPlayer, removePlayer }) {
+  const [fixtureSync, setFixtureSync] = useState(null);
+  const [fixtureSyncMsg, setFixtureSyncMsg] = useState("");
+
+  async function syncAll() {
+    setFixtureSync("loading");
+    setFixtureSyncMsg("");
+    try {
+      const [fixtRes, scoreRes] = await Promise.all([
+        fetch("/api/sync-fixtures").then(r=>r.json()),
+        fetch("/api/sync-scores").then(r=>r.json()),
+      ]);
+      if (fixtRes.ok && scoreRes.ok) {
+        setFixtureSync("ok");
+        const parts = [];
+        if (fixtRes.updated?.length) parts.push("Fixtures: " + fixtRes.updated.join(", "));
+        parts.push(`Scores synced (${scoreRes.changes} outcome(s) updated)`);
+        setFixtureSyncMsg(parts.join(" · "));
+      } else {
+        setFixtureSync("error");
+        const errs = [fixtRes.ok ? null : fixtRes.error, scoreRes.ok ? null : scoreRes.error].filter(Boolean);
+        setFixtureSyncMsg(errs.join("; ") || "Unknown error");
+      }
+    } catch (e) {
+      setFixtureSync("error");
+      setFixtureSyncMsg(e.message);
+    }
+  }
+
   return (
     <div style={S.settings}>
       <h2 style={S.sectionTitle}>SETTINGS</h2>
@@ -1701,6 +1731,21 @@ function SettingsTab({ state, update, newPlayerName, setNewPlayerName, addPlayer
         <p style={{margin:0,fontSize:12,color:"#9ca3af",lineHeight:1.5}}>
           Share this URL in your WhatsApp group. All picks and results sync within about five seconds for everyone.
         </p>
+      </div>
+      <div style={S.settingGroup}>
+        <h3 style={S.settingGroupTitle}>FIXTURES</h3>
+        <p style={{fontSize:12,color:"#6b7280",marginBottom:10,lineHeight:1.5}}>
+          Pulls the latest fixture list from the API and updates team names for upcoming rounds. Run this after each round's draw is confirmed.
+        </p>
+        <button
+          onClick={syncAll}
+          disabled={fixtureSync==="loading"}
+          style={{...S.addBtn,width:"100%",padding:"10px 0",justifyContent:"center",opacity:fixtureSync==="loading"?0.5:1}}
+        >
+          {fixtureSync==="loading" ? "Syncing..." : "Sync fixtures & scores"}
+        </button>
+        {fixtureSync==="ok"&&<p style={{fontSize:11,color:"#a8e031",marginTop:6}}>{fixtureSyncMsg}</p>}
+        {fixtureSync==="error"&&<p style={{fontSize:11,color:"#E61D25",marginTop:6}}>Error: {fixtureSyncMsg}</p>}
       </div>
       <div style={S.settingGroup}>
         <h3 style={S.settingGroupTitle}>PLAYERS</h3>
