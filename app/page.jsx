@@ -1138,13 +1138,13 @@ function FixturesTab({ game, matchResults }) {
                   const homeWon=hasScore&&result.h>result.a;
                   const awayWon=hasScore&&result.a>result.h;
                   return (
-                    <div key={i} style={{...S.fixtureRow,gridTemplateColumns:"76px 1fr 52px 1fr"}}>
+                    <div key={i} style={{...S.fixtureRow,gridTemplateColumns:"60px 1fr 44px 1fr",gap:4}}>
                       <span style={S.fixtureDate}><span style={{display:"block"}}>{date}</span><span style={{display:"block"}}>{time}</span></span>
-                      <span style={{...S.fixtureTeam,color:hasScore?(homeWon?"#a8e031":"#888"):"#ccc",fontWeight:homeWon?700:400}}>{FLAG[home]||"🏳️"} {home}</span>
-                      <span style={{...S.fixtureVs,fontSize:hasScore?13:9,color:hasScore?"#fff":"#333",letterSpacing:hasScore?1:1,fontFamily:hasScore?"'Bebas Neue',sans-serif":"inherit"}}>
-                        {hasScore?`${result.h} - ${result.a}`:"v"}
+                      <span style={{...S.fixtureTeam,color:hasScore?(homeWon?"#a8e031":"#666"):"#ccc",fontWeight:homeWon?700:400,textAlign:"right",paddingRight:2}}>{home} {FLAG[home]||"🏳️"}</span>
+                      <span style={{...S.fixtureVs,fontSize:hasScore?12:9,color:hasScore?"#fff":"#444",fontFamily:hasScore?"'Bebas Neue',sans-serif":"inherit",textAlign:"center",letterSpacing:0}}>
+                        {hasScore?`${result.h}-${result.a}`:"v"}
                       </span>
-                      <span style={{...S.fixtureTeam,color:hasScore?(awayWon?"#a8e031":"#888"):"#ccc",fontWeight:awayWon?700:400,textAlign:"right"}}>{FLAG[away]||"🏳️"} {away}</span>
+                      <span style={{...S.fixtureTeam,color:hasScore?(awayWon?"#a8e031":"#666"):"#ccc",fontWeight:awayWon?700:400,paddingLeft:2}}>{FLAG[away]||"🏳️"} {away}</span>
                     </div>
                   );
                 })}
