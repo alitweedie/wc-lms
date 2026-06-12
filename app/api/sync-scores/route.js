@@ -1,18 +1,10 @@
 // Place at: app/api/sync-scores/route.js
-//
-// Cron endpoint — called by Vercel Cron every 5 minutes during the tournament.
-// Fetches finished WC matches from football-data.org, resolves LMS outcomes
-// automatically, and saves state back to Redis.
-//
-// Safe to call manually too: GET /api/sync-scores
-// Add ?dry=1 to preview what WOULD change without saving anything.
+
+import { Redis } from "@upstash/redis";
 
 export const dynamic = "force-dynamic";
 
-import { Redis } from "@upstash/redis";
-import { toTrackerLabel } from "../test-scores/route";
-
-// ── Redis (matches your existing /api/state/route.js exactly) ────────────────
+// ── Redis ─────────────────────────────────────────────────────────────────────
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -30,7 +22,42 @@ async function saveState(state) {
   await redis.set(KEY, state);
 }
 
-// ── Shared constants (mirrors page.jsx) ──────────────────────────────────────
+// ── Team name mapping (football-data.org → tracker labels) ───────────────────
+const TRACKER_TEAMS = [
+  "Algeria","Argentina","Australia","Austria","Belgium","Bosnia & Herz.",
+  "Brazil","Canada","Cape Verde","Colombia","Croatia","Curaçao",
+  "Czechia","DR Congo","Ecuador","Egypt","England","France","Germany","Ghana",
+  "Haiti","Iran","Iraq","Ivory Coast","Japan","Jordan","Mexico","Morocco",
+  "Netherlands","New Zealand","Norway","Panama","Paraguay","Portugal","Qatar",
+  "Saudi Arabia","Scotland","Senegal","South Africa","South Korea","Spain",
+  "Sweden","Switzerland","Tunisia","Turkey","Uruguay","USA","Uzbekistan",
+];
+
+const NAME_MAP = {
+  "United States":          "USA",
+  "Korea Republic":         "South Korea",
+  "Türkiye":                "Turkey",
+  "IR Iran":                "Iran",
+  "Bosnia and Herzegovina": "Bosnia & Herz.",
+  "Bosnia-Herzegovina":     "Bosnia & Herz.",
+  "Côte d'Ivoire":          "Ivory Coast",
+  "Cote d'Ivoire":          "Ivory Coast",
+  "Congo DR":               "DR Congo",
+  "Cape Verde Islands":     "Cape Verde",
+  "Cabo Verde":             "Cape Verde",
+  "Czech Republic":         "Czechia",
+  "CuraÃ§ao":              "Curaçao",
+  "Curacao":                "Curaçao",
+};
+
+function toTrackerLabel(apiName) {
+  if (!apiName) return null;
+  if (NAME_MAP[apiName]) return NAME_MAP[apiName];
+  if (TRACKER_TEAMS.includes(apiName)) return apiName;
+  return null;
+}
+
+// ── Shared constants ──────────────────────────────────────────────────────────
 const OUTCOME = { WIN: "win", LOSE: "lose", DRAW: "draw", PENDING: "" };
 const ENTRY_FEE = 2;
 
@@ -45,7 +72,7 @@ const ROUNDS = [
   { id:8, stage:"Final" },
 ];
 
-// ── State helpers (mirrors page.jsx logic) ───────────────────────────────────
+// ── State helpers ─────────────────────────────────────────────────────────────
 function roundResolved(round) {
   return Object.values(round.outcomes).some(
     o => o === OUTCOME.WIN || o === OUTCOME.LOSE || o === OUTCOME.DRAW
@@ -116,7 +143,7 @@ function buildGame(id, startRoundIdx = 0) {
   return {
     id, label: `Game ${id}`, startRoundIdx,
     rounds: ROUNDS.slice(startRoundIdx).map(r => ({
-      id: r.id, label: r.label ?? "", stage: r.stage, picks: {}, outcomes: {}, tiebreaker: {},
+      id: r.id, label: "", stage: r.stage, picks: {}, outcomes: {}, tiebreaker: {},
     })),
     complete: false, winners: [], rollover: 0,
   };
@@ -156,9 +183,8 @@ function evaluateGameEnd(g, players) {
     : (isFinalRound && survivors.length > 0 ? survivors : []);
   if (survivors.length === 0) g.rolledOver = true;
 
-  // Don't spawn a new game after the Final
   const wcIdx = ROUNDS.findIndex(wr => wr.id === lastRound.id);
-  if (wcIdx >= ROUNDS.length - 1) return;
+  if (wcIdx >= ROUNDS.length - 1) return; // don't spawn after the Final
 
   const pot     = calcPot(g, players);
   const newGame = buildGame(0, wcIdx + 1);
@@ -166,7 +192,7 @@ function evaluateGameEnd(g, players) {
   return newGame;
 }
 
-// ── Fetch finished WC matches from football-data.org ────────────────────────
+// ── Football data ─────────────────────────────────────────────────────────────
 async function fetchFinishedMatches(apiKey) {
   const res = await fetch(
     "https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED",
@@ -177,13 +203,11 @@ async function fetchFinishedMatches(apiKey) {
   return (data.matches ?? []).map(m => ({
     homeLabel: toTrackerLabel(m.homeTeam?.name),
     awayLabel: toTrackerLabel(m.awayTeam?.name),
-    winner:    m.score?.winner,   // HOME_TEAM | AWAY_TEAM | DRAW
-    duration:  m.score?.duration, // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
+    winner:    m.score?.winner,
+    duration:  m.score?.duration,
   }));
 }
 
-// Build a lookup: "TeamA|TeamB" → { winner, duration }
-// Both orderings stored so pick-lookup is order-independent.
 function buildResultLookup(matches) {
   const lookup = {};
   for (const m of matches) {
@@ -197,56 +221,43 @@ function buildResultLookup(matches) {
   return lookup;
 }
 
-// Resolve a player's picked team against the result lookup.
-// Returns WIN | LOSE | DRAW | null (null = match not finished yet)
 function resolveOutcome(pick, resultLookup, isKnockout) {
-  // Find any lookup entry where pick is the home team (avoid double-counting)
   for (const [key, result] of Object.entries(resultLookup)) {
     const [home] = key.split("|");
     if (home !== pick) continue;
-
-    const { winner, duration } = result;
-
+    const { winner } = result;
     if (winner === "DRAW") {
-      // In knockouts the API still returns HOME_TEAM/AWAY_TEAM when ET/pens decide it,
-      // so a genuine DRAW here only occurs in the group stage.
-      if (isKnockout) return null; // shouldn't happen, but guard anyway
-      return OUTCOME.DRAW;
+      return isKnockout ? null : OUTCOME.DRAW;
     }
-
     return winner === "HOME_TEAM" ? OUTCOME.WIN : OUTCOME.LOSE;
   }
-  return null; // match not in finished results yet
+  return null;
 }
 
-// ── Main handler ─────────────────────────────────────────────────────────────
+// ── Main handler ──────────────────────────────────────────────────────────────
 export async function GET(request) {
   const isDry      = new URL(request.url).searchParams.get("dry") === "1";
   const apiKey     = process.env.FOOTBALL_DATA_API_KEY;
   const cronSecret = process.env.CRON_SECRET;
   const log        = [];
 
-  if (!apiKey) return json({ error: "FOOTBALL_DATA_API_KEY not set" }, 500);
+  if (!apiKey) return respond({ error: "FOOTBALL_DATA_API_KEY not set" }, 500);
 
-  // Protect the live endpoint from external callers.
-  // Dry-run is always allowed (read-only); live runs require the secret header
-  // that Vercel Cron sends automatically.
+  // Live runs require the cron secret header; dry runs are always open
   if (!isDry && cronSecret) {
-    const incoming = request.headers.get("x-cron-secret");
-    if (incoming !== cronSecret) return json({ error: "Unauthorised" }, 401);
+    if (request.headers.get("x-cron-secret") !== cronSecret) {
+      return respond({ error: "Unauthorised" }, 401);
+    }
   }
 
   try {
-    // 1. Load state from Redis
     const state = await loadState();
-    if (!state) return json({ error: "No state in Redis" }, 500);
+    if (!state) return respond({ error: "No state in Redis" }, 500);
 
-    // 2. Fetch all finished matches and build lookup
     const finished     = await fetchFinishedMatches(apiKey);
     log.push(`Fetched ${finished.length} finished match(es) from API`);
     const resultLookup = buildResultLookup(finished);
 
-    // 3. Walk every active game → every round → every alive player
     let totalChanges = 0;
 
     for (const game of state.games) {
@@ -264,13 +275,11 @@ export async function GET(request) {
           const pick    = round.picks[player];
           const current = round.outcomes[player];
 
-          if (!pick) continue; // no pick yet
-          if (current === OUTCOME.WIN || current === OUTCOME.LOSE || current === OUTCOME.DRAW) {
-            continue; // already resolved — never overwrite
-          }
+          if (!pick) continue;
+          if (current === OUTCOME.WIN || current === OUTCOME.LOSE || current === OUTCOME.DRAW) continue;
 
           const outcome = resolveOutcome(pick, resultLookup, isKnockout);
-          if (outcome === null) continue; // match not finished yet
+          if (outcome === null) continue;
 
           log.push(`${game.label} R${round.id}: ${player} picked ${pick} → ${outcome}`);
           if (!isDry) {
@@ -279,7 +288,6 @@ export async function GET(request) {
           }
         }
 
-        // Check whether this outcome update ended the game
         if (!isDry && totalChanges > 0) {
           const newGame = evaluateGameEnd(game, state.players);
           if (newGame) {
@@ -295,7 +303,6 @@ export async function GET(request) {
       }
     }
 
-    // 4. Save if anything changed
     if (!isDry && totalChanges > 0) {
       await saveState(state);
       log.push(`Saved — ${totalChanges} outcome(s) updated`);
@@ -305,15 +312,15 @@ export async function GET(request) {
       log.push("No new outcomes to update");
     }
 
-    return json({ ok: true, dry: isDry, changes: totalChanges, log });
+    return respond({ ok: true, dry: isDry, changes: totalChanges, log });
 
   } catch (e) {
     log.push("Error: " + e.message);
-    return json({ ok: false, log, error: e.message }, 500);
+    return respond({ ok: false, log, error: e.message }, 500);
   }
 }
 
-function json(obj, status = 200) {
+function respond(obj, status = 200) {
   return new Response(JSON.stringify(obj, null, 2), {
     status,
     headers: { "Content-Type": "application/json" },
