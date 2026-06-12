@@ -4,25 +4,7 @@ import { Redis } from "@upstash/redis";
 
 export const dynamic = "force-dynamic";
 
-// ── Redis ─────────────────────────────────────────────────────────────────────
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
-
-const KEY = "wc_lms_state";
-
-async function loadState() {
-  const data = await redis.get(KEY);
-  return data || null;
-}
-
-async function saveState(state) {
-  state.lastUpdated = Date.now();
-  await redis.set(KEY, state);
-}
-
-// ── Team name mapping (football-data.org → tracker labels) ───────────────────
+// ── Team name mapping ─────────────────────────────────────────────────────────
 const TRACKER_TEAMS = [
   "Algeria","Argentina","Australia","Austria","Belgium","Bosnia & Herz.",
   "Brazil","Canada","Cape Verde","Colombia","Croatia","Curaçao",
@@ -57,9 +39,10 @@ function toTrackerLabel(apiName) {
   return null;
 }
 
-// ── Shared constants ──────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 const OUTCOME = { WIN: "win", LOSE: "lose", DRAW: "draw", PENDING: "" };
 const ENTRY_FEE = 2;
+const KEY = "wc_lms_state";
 
 const ROUNDS = [
   { id:1, stage:"Group Stage" },
@@ -71,6 +54,24 @@ const ROUNDS = [
   { id:7, stage:"Semi-Finals" },
   { id:8, stage:"Final" },
 ];
+
+// ── Redis — instantiated lazily inside handler so env vars are always present ─
+function getRedis() {
+  return new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+}
+
+async function loadState() {
+  const data = await getRedis().get(KEY);
+  return data || null;
+}
+
+async function saveState(state) {
+  state.lastUpdated = Date.now();
+  await getRedis().set(KEY, state);
+}
 
 // ── State helpers ─────────────────────────────────────────────────────────────
 function roundResolved(round) {
@@ -184,7 +185,7 @@ function evaluateGameEnd(g, players) {
   if (survivors.length === 0) g.rolledOver = true;
 
   const wcIdx = ROUNDS.findIndex(wr => wr.id === lastRound.id);
-  if (wcIdx >= ROUNDS.length - 1) return; // don't spawn after the Final
+  if (wcIdx >= ROUNDS.length - 1) return;
 
   const pot     = calcPot(g, players);
   const newGame = buildGame(0, wcIdx + 1);
@@ -226,9 +227,7 @@ function resolveOutcome(pick, resultLookup, isKnockout) {
     const [home] = key.split("|");
     if (home !== pick) continue;
     const { winner } = result;
-    if (winner === "DRAW") {
-      return isKnockout ? null : OUTCOME.DRAW;
-    }
+    if (winner === "DRAW") return isKnockout ? null : OUTCOME.DRAW;
     return winner === "HOME_TEAM" ? OUTCOME.WIN : OUTCOME.LOSE;
   }
   return null;
@@ -242,8 +241,9 @@ export async function GET(request) {
   const log        = [];
 
   if (!apiKey) return respond({ error: "FOOTBALL_DATA_API_KEY not set" }, 500);
+  if (!process.env.UPSTASH_REDIS_REST_URL) return respond({ error: "UPSTASH_REDIS_REST_URL not set" }, 500);
+  if (!process.env.UPSTASH_REDIS_REST_TOKEN) return respond({ error: "UPSTASH_REDIS_REST_TOKEN not set" }, 500);
 
-  // Live runs require the cron secret header; dry runs are always open
   if (!isDry && cronSecret) {
     if (request.headers.get("x-cron-secret") !== cronSecret) {
       return respond({ error: "Unauthorised" }, 401);
