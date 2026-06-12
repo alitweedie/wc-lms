@@ -38,38 +38,36 @@ function toTrackerLabel(apiName) {
 }
 
 // ── Redis via plain fetch (no client library) ─────────────────────────────────
+// POST to the base URL with a JSON array matching the Redis command signature.
+// This is exactly what @upstash/redis does internally.
 const KEY = "wc_lms_state";
 
-async function loadState() {
+async function redisCmd(args) {
   const url   = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) throw new Error("Upstash env vars not set");
-  const res = await fetch(`${url}/get/${KEY}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`Redis GET failed: ${res.status}`);
-  const { result } = await res.json();
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error("Redis " + args[0] + " failed " + res.status + ": " + txt);
+  }
+  return res.json();
+}
+
+async function loadState() {
+  const { result } = await redisCmd(["GET", KEY]);
   if (!result) return null;
   return typeof result === "string" ? JSON.parse(result) : result;
 }
 
 async function saveState(state) {
-  const url   = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) throw new Error("Upstash env vars not set");
   state.lastUpdated = Date.now();
-  // Upstash REST: POST /pipeline with array of commands, each as [cmd, key, value]
-  // Using pipeline to match exactly how @upstash/redis client stores the value
-  const res = await fetch(`${url}/pipeline`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify([["SET", KEY, JSON.stringify(state)]]),
-  });
-  if (!res.ok) throw new Error(`Redis SET failed: ${res.status}`);
+  await redisCmd(["SET", KEY, JSON.stringify(state)]);
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
