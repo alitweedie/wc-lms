@@ -1,5 +1,3 @@
-// v2
-
 // Place at: app/api/sync-scores/route.js
 
 export const dynamic = "force-dynamic";
@@ -39,22 +37,43 @@ function toTrackerLabel(apiName) {
   return null;
 }
 
-// ── State via your own /api/state route ──────────────────────────────────────
-// This avoids any Redis client issues by reusing the working endpoint.
-async function loadState(baseUrl) {
-  const res = await fetch(`${baseUrl}/api/state`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to load state: ${res.status}`);
-  return res.json();
+// ── Redis via plain fetch (no client library) ─────────────────────────────────
+// Talks directly to Upstash REST API — same thing @upstash/redis does
+// internally, but without any module-level initialisation that can crash.
+const KEY = "wc_lms_state";
+
+async function loadState() {
+  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) throw new Error("Upstash env vars not set");
+
+  const res = await fetch(`${url}/get/${KEY}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Redis GET failed: ${res.status}`);
+  const { result } = await res.json();
+  // Upstash returns the value as a string if stored via @upstash/redis client,
+  // or as a parsed object if stored via REST. Handle both.
+  if (!result) return null;
+  return typeof result === "string" ? JSON.parse(result) : result;
 }
 
-async function saveState(baseUrl, state) {
+async function saveState(state) {
+  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) throw new Error("Upstash env vars not set");
+
   state.lastUpdated = Date.now();
-  const res = await fetch(`${baseUrl}/api/state`, {
+  const res = await fetch(`${url}/set/${KEY}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(state),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([KEY, JSON.stringify(state)]),
   });
-  if (!res.ok) throw new Error(`Failed to save state: ${res.status}`);
+  if (!res.ok) throw new Error(`Redis SET failed: ${res.status}`);
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -235,7 +254,6 @@ function resolveOutcome(pick, resultLookup, isKnockout) {
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function GET(request) {
   const url        = new URL(request.url);
-  const baseUrl    = `${url.protocol}//${url.host}`;
   const isDry      = url.searchParams.get("dry") === "1";
   const apiKey     = process.env.FOOTBALL_DATA_API_KEY;
   const cronSecret = process.env.CRON_SECRET;
@@ -250,7 +268,7 @@ export async function GET(request) {
   }
 
   try {
-    const state = await loadState(baseUrl);
+    const state = await loadState();
     if (!state) return respond({ error: "No state in Redis" }, 500);
     log.push("State loaded successfully");
 
@@ -304,7 +322,7 @@ export async function GET(request) {
     }
 
     if (!isDry && totalChanges > 0) {
-      await saveState(baseUrl, state);
+      await saveState(state);
       log.push(`Saved — ${totalChanges} outcome(s) updated`);
     } else if (isDry) {
       log.push("Dry run — nothing saved");
