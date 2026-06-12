@@ -1,5 +1,3 @@
-// v2
-
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 
@@ -785,7 +783,7 @@ export default function App() {
             closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker}
             editingRound={editingRound} setEditingRound={setEditingRound}/>
         )}
-        {tab==="fixtures"&&<FixturesTab game={game}/>}
+        {tab==="fixtures"&&<FixturesTab game={game} matchResults={state.matchResults||{}}/>}
         {tab==="money"&&<MoneyTab state={state}/>}
         {tab==="predictor"&&(
           <PredictorTab
@@ -1100,7 +1098,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
 // ═══════════════════════════════════════════════════════════════════════════════
 // FIXTURES TAB
 // ═══════════════════════════════════════════════════════════════════════════════
-function FixturesTab({ game }) {
+function FixturesTab({ game, matchResults }) {
   const [openRound, setOpenRound] = useState(game.rounds[0]?.id||1);
   return (
     <div>
@@ -1110,6 +1108,9 @@ function FixturesTab({ game }) {
         const wcRound=ROUNDS.find(r=>r.id===round.id);
         if (!wcRound) return null;
         const isOpen=openRound===round.id;
+        const finishedCount=wcRound.fixtures.filter(([h,a])=>matchResults[`${h}|${a}`]!==undefined).length;
+        const totalCount=wcRound.fixtures.length;
+        const allDone=finishedCount===totalCount&&totalCount>0;
         return (
           <div key={round.id} style={S.fixtureSection}>
             <div style={S.fixtureSectionHeader} onClick={()=>setOpenRound(isOpen?null:round.id)}>
@@ -1118,20 +1119,35 @@ function FixturesTab({ game }) {
                 <span style={S.fixtureSectionTitle}>{wcRound.label}</span>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
-                <span style={S.deadlineBadge}>First KO {wcRound.fixtures?.[0]?.[2]} {wcRound.fixtures?.[0]?.[3]}</span>
+                {finishedCount>0&&(
+                  <span style={{...S.deadlineBadge,color:allDone?"#a8e031":"#f59e0b",borderColor:allDone?"#a8e031":"#f59e0b"}}>
+                    {allDone?"FT":"LIVE"} {finishedCount}/{totalCount}
+                  </span>
+                )}
+                {finishedCount===0&&(
+                  <span style={S.deadlineBadge}>First KO {wcRound.fixtures?.[0]?.[2]} {wcRound.fixtures?.[0]?.[3]}</span>
+                )}
                 <span style={S.expandChevron}>{isOpen?"▲":"▼"}</span>
               </div>
             </div>
             {isOpen&&(
               <div>
-                {wcRound.fixtures.map(([home,away,date,time],i)=>(
-                  <div key={i} style={S.fixtureRow}>
-                    <span style={S.fixtureDate}><span style={{display:"block"}}>{date}</span><span style={{display:"block"}}>{time}</span></span>
-                    <span style={S.fixtureTeam}>{FLAG[home]||"🏳️"} {home}</span>
-                    <span style={S.fixtureVs}>v</span>
-                    <span style={S.fixtureTeam}>{FLAG[away]||"🏳️"} {away}</span>
-                  </div>
-                ))}
+                {wcRound.fixtures.map(([home,away,date,time],i)=>{
+                  const result=matchResults[`${home}|${away}`];
+                  const hasScore=result!==undefined;
+                  const homeWon=hasScore&&result.h>result.a;
+                  const awayWon=hasScore&&result.a>result.h;
+                  return (
+                    <div key={i} style={{...S.fixtureRow,gridTemplateColumns:"76px 1fr 52px 1fr"}}>
+                      <span style={S.fixtureDate}><span style={{display:"block"}}>{date}</span><span style={{display:"block"}}>{time}</span></span>
+                      <span style={{...S.fixtureTeam,color:hasScore?(homeWon?"#a8e031":"#888"):"#ccc",fontWeight:homeWon?700:400}}>{FLAG[home]||"🏳️"} {home}</span>
+                      <span style={{...S.fixtureVs,fontSize:hasScore?13:9,color:hasScore?"#fff":"#333",letterSpacing:hasScore?1:1,fontFamily:hasScore?"'Bebas Neue',sans-serif":"inherit"}}>
+                        {hasScore?`${result.h} - ${result.a}`:"v"}
+                      </span>
+                      <span style={{...S.fixtureTeam,color:hasScore?(awayWon?"#a8e031":"#888"):"#ccc",fontWeight:awayWon?700:400,textAlign:"right"}}>{FLAG[away]||"🏳️"} {away}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
