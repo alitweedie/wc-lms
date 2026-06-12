@@ -59,13 +59,15 @@ async function saveState(state) {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) throw new Error("Upstash env vars not set");
   state.lastUpdated = Date.now();
-  const res = await fetch(`${url}/set/${KEY}`, {
+  // Upstash REST: POST /pipeline with array of commands, each as [cmd, key, value]
+  // Using pipeline to match exactly how @upstash/redis client stores the value
+  const res = await fetch(`${url}/pipeline`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify([KEY, JSON.stringify(state)]),
+    body: JSON.stringify([["SET", KEY, JSON.stringify(state)]]),
   });
   if (!res.ok) throw new Error(`Redis SET failed: ${res.status}`);
 }
