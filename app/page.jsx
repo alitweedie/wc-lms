@@ -393,10 +393,13 @@ function evaluateGameEnd(g, players) {
   g.winners = survivors.length === 1 ? survivors : (isFinalRound && survivors.length > 0 ? survivors : []);
   if (survivors.length === 0) g.rolledOver = true;
 
-  const pot = calcPot(g, players);
+  // The Final is the last round of the tournament — there is no next round,
+  // so no new game should ever spawn after it.
   const wcIdx = ROUNDS.findIndex(wr => wr.id === lastRound.id);
-  const nextWCIdx = Math.min(wcIdx + 1, ROUNDS.length - 1);
-  const newGame = buildGame(0, nextWCIdx);
+  if (wcIdx >= ROUNDS.length - 1) return;
+
+  const pot = calcPot(g, players);
+  const newGame = buildGame(0, wcIdx + 1);
   newGame.rollover = alive.length === 0 ? pot : 0;
   return newGame;
 }
@@ -683,7 +686,6 @@ export default function App() {
   const actualEntrants = roundResolved(game.rounds[0]) ? entrants : r0picks;
   const aliveNow = actualEntrants.filter(p=>elimMap[p]==null);
   const pot = calcPot(game, state.players);
-  const syncLabel = syncing?"saving…":lastSync?`synced ${Math.round((Date.now()-lastSync)/1000)}s ago`:"";
   const pred = state.predictor || { picks:{}, answers:{}, locked:false };
   const predEntrantCount = state.players.filter(p => pred.picks[p] && Object.keys(pred.picks[p]).some(id => id !== "tiebreak" && pred.picks[p][id] !== "" && pred.picks[p][id] !== null && pred.picks[p][id] !== undefined)).length;
   const predPotTotal = predEntrantCount * PREDICTOR_FEE;
@@ -747,29 +749,29 @@ export default function App() {
         </nav>
         {tab==="tracker"&&game.complete&&game.winners.length>0&&(
           <div style={S.winnerBanner}>
-            <div style={{fontSize:28}}>🏆</div>
+            <div style={{fontSize:30,lineHeight:1}}>🏆</div>
             <div>
-              <div style={{fontSize:9,letterSpacing:4,color:"rgba(255,255,255,0.9)",textTransform:"uppercase",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>GAME OVER</div>
-              <div style={{fontSize:28,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3}}>{game.winners.join(" & ")} WIN!</div>
-              <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",marginTop:2}}>Prize: £{Math.floor(pot/game.winners.length)} each · Next game starts from the next round</div>
+              <div style={{fontSize:9,letterSpacing:4,color:"rgba(255,255,255,0.9)",textTransform:"uppercase",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Game over</div>
+              <div style={{fontSize:28,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,lineHeight:1.05}}>{game.winners.join(" & ")} WIN</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",marginTop:3}}>£{Math.floor(pot/game.winners.length)} each · a new game starts from the next round</div>
             </div>
           </div>
         )}
         {tab==="tracker"&&game.rolledOver&&(
-          <div style={S.rolloverBanner}>🔁 Everyone out — £{pot} rolls over to {state.games[gi+1]?.label||"next game"}</div>
+          <div style={S.rolloverBanner}>Everyone out — £{pot} rolls over to {state.games[gi+1]?.label||"the next game"}</div>
         )}
         {tab==="tracker"&&game.rollover>0&&!game.rolledOver&&(
-          <div style={S.rolloverBanner}>🔁 Rollover included: +£{game.rollover} carried into this game's pot</div>
+          <div style={S.rolloverBanner}>Rollover included — £{game.rollover} carried into this game's pot</div>
         )}
         {tab==="tracker"&&!game.complete&&aliveNow.length===1&&(
-          <div style={{background:"#E61D25",padding:"10px 18px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-            <span style={{fontSize:22,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff"}}>⚡ LAST MAN STANDING</span>
-            <span style={{fontSize:12,color:"rgba(255,255,255,0.9)",fontWeight:700}}>{aliveNow[0]}</span>
+          <div style={{background:"#E61D25",padding:"11px 18px",display:"flex",alignItems:"baseline",gap:12,flexShrink:0}}>
+            <span style={{fontSize:22,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff",lineHeight:1}}>LAST MAN STANDING</span>
+            <span style={{fontSize:12,color:"rgba(255,255,255,0.9)",fontWeight:700,letterSpacing:1}}>{aliveNow[0]}</span>
           </div>
         )}
         {tab==="tracker"&&!game.complete&&aliveNow.length>1&&aliveNow.length<=3&&(
-          <div style={{background:"#E61D25",padding:"8px 18px",display:"flex",alignItems:"center",flexShrink:0}}>
-            <span style={{fontSize:20,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff"}}>🔥 FINAL SHOWDOWN — {aliveNow.length} REMAINING</span>
+          <div style={{background:"#E61D25",padding:"9px 18px",display:"flex",alignItems:"center",flexShrink:0}}>
+            <span style={{fontSize:20,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff",lineHeight:1}}>FINAL SHOWDOWN — {aliveNow.length} REMAINING</span>
           </div>
         )}
       </header>
@@ -779,7 +781,7 @@ export default function App() {
           <TrackerTab rounds={trackerRounds} game={game} gi={gi} state={state}
             elimMap={elimMap} entrants={entrants} setPick={setPick} setOutcome={setOutcome}
             closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker}
-            editingRound={editingRound} setEditingRound={setEditingRound} update={update}/>
+            editingRound={editingRound} setEditingRound={setEditingRound}/>
         )}
         {tab==="fixtures"&&<FixturesTab game={game}/>}
         {tab==="money"&&<MoneyTab state={state}/>}
@@ -806,10 +808,10 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRACKER
 // ═══════════════════════════════════════════════════════════════════════════════
-function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, editingRound, setEditingRound, update }) {
+function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, editingRound, setEditingRound }) {
   return (
     <div>
-      {rounds.map((round, idx) => {
+      {rounds.map((round) => {
         const wcRound = ROUNDS.find(r=>r.id===round.id);
         const realRoundIdx = game.rounds.indexOf(round);
         const aliveAtStart = getAliveAtStart(game, state.players, realRoundIdx);
@@ -820,7 +822,7 @@ function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOu
             setPick={setPick} setOutcome={setOutcome} closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker} isFirstRound={isFirstRound}
             isEditing={editingRound===`${gi}-${round.id}`}
             setEditing={v=>setEditingRound(v?`${gi}-${round.id}`:null)}
-            update={update} roundIndex={realRoundIdx}/>
+            roundIndex={realRoundIdx}/>
         );
       })}
     </div>
@@ -836,20 +838,20 @@ function ReopenRoundPanel({ onReopen }) {
         <div style={{display:"flex",gap:6}}>
           <button
             onClick={e=>{e.stopPropagation(); onReopen(); setConfirming(false);}}
-            style={{background:"rgba(245,158,11,0.2)",border:"1px solid #f59e0b",color:"#a8e031",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700}}>
-            ✓ CONFIRM
+            style={{background:"rgba(245,158,11,0.2)",border:"1px solid #f59e0b",color:"#f59e0b",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700}}>
+            Confirm
           </button>
           <button
             onClick={e=>{e.stopPropagation(); setConfirming(false);}}
             style={{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif"}}>
-            CANCEL
+            Cancel
           </button>
         </div>
       ) : (
         <button
           onClick={e=>{e.stopPropagation(); setConfirming(true);}}
-          style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.4)",color:"#a8e031",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,letterSpacing:1,fontFamily:"'DM Sans',sans-serif",fontWeight:700}}>
-          ↩ REOPEN ROUND
+          style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.4)",color:"#f59e0b",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:9,letterSpacing:2,fontFamily:"'DM Sans',sans-serif",fontWeight:700,textTransform:"uppercase"}}>
+          Reopen round
         </button>
       )}
     </div>
@@ -868,26 +870,26 @@ function CloseRoundPanel({ unpickedAlive, onClose }) {
           <button
             onClick={e=>{e.stopPropagation(); onClose(); setConfirming(false);}}
             style={{...S.closeRoundBtn,background:"rgba(229,57,53,0.25)",borderColor:"#e53935"}}>
-            ✓ CONFIRM
+            Confirm
           </button>
           <button
             onClick={e=>{e.stopPropagation(); setConfirming(false);}}
             style={{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"'DM Sans',sans-serif"}}>
-            CANCEL
+            Cancel
           </button>
         </div>
       ) : (
         <button
           onClick={e=>{e.stopPropagation(); setConfirming(true);}}
           style={S.closeRoundBtn}>
-          ⛔ CLOSE ROUND
+          Close round
         </button>
       )}
     </div>
   );
 }
 
-function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, isFirstRound, isEditing, setEditing, update, roundIndex }) {
+function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, isFirstRound, isEditing, setEditing, roundIndex }) {
   const resolved = roundResolved(round);
   const survivors = aliveAtStart.filter(p=>round.outcomes[p]===OUTCOME.WIN);
   const ousted = aliveAtStart.filter(p=>
@@ -912,12 +914,12 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
             <h2 style={S.roundLabel}>{round.label}</h2>
             {resolved
-              ?<span style={S.resolvedBadge}>✓ {survivors.length} survive</span>
+              ?<span style={S.resolvedBadge}>{survivors.length} survive</span>
               :deadlinePassed
-                ?<span style={{background:"#E61D25",color:"#fff",borderRadius:2,padding:"4px 10px",fontSize:9,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>🔒 LOCKED</span>
+                ?<span style={S.lockedBadge}>Locked</span>
                 :<span style={S.expandChevron}>{expanded?"▲":"▼"}</span>}
           </div>
-          {wcRound&&(()=>{ const lt=getRoundLockTime(wcRound); return <span style={S.roundDeadline}>🔒 Locks at first KO: {wcRound.fixtures[0]?.[2]} {wcRound.fixtures[0]?.[3]}</span>; })()}
+          {wcRound&&<span style={S.roundDeadline}>Locks at first kick-off · {wcRound.fixtures[0]?.[2]} {wcRound.fixtures[0]?.[3]}</span>}
         </div>
       </div>
 
@@ -994,7 +996,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                               <span style={{fontSize:28,lineHeight:1}}>{FLAG[pick]||"🏳️"}</span>
                             </>
                           ):deadlinePassed&&!resolved?(
-                            <span style={{color:"#E61D25",fontSize:9,fontWeight:700,letterSpacing:1}}>⏰ NO PICK</span>
+                            <span style={{color:"#E61D25",fontSize:9,fontWeight:700,letterSpacing:1}}>NO PICK</span>
                           ):(
                             <span style={{color:"#555",fontStyle:"italic",fontSize:11}}>No pick</span>
                           )}
@@ -1034,14 +1036,14 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
 
           {resolved&&(
             <div style={S.resultBar}>
-              ✓ {survivors.length} survive{survivors.length>0?` · ${survivors.join(", ")}`:""} · ✗ {ousted.length} out
+              {survivors.length} survive{survivors.length>0?` · ${survivors.join(", ")}`:""} · {ousted.length} out
             </div>
           )}
 
           {wcRound?.hasTiebreaker&&(
             <div style={{padding:"12px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26"}}>
-              <div style={{fontSize:9,letterSpacing:3,color:"#E61D25",textTransform:"uppercase",fontWeight:700,marginBottom:8,fontFamily:"'DM Sans',sans-serif"}}>
-                ⚡ TIEBREAKER — Minute of first goal in the Final
+              <div style={{...S.eyebrow,color:"#E61D25",marginBottom:8}}>
+                Tiebreaker — minute of first goal in the Final
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:1,background:"#1e1f26"}}>
                 {state.players.map(player => {
@@ -1050,7 +1052,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                   if (!isAlivePlayer) return null;
                   return (
                     <div key={player} style={{background:"#13141a",padding:"10px 12px"}}>
-                      <div style={{fontSize:11,fontWeight:700,color:"#fff",letterSpacing:0.5,textTransform:"uppercase",marginBottom:5}}>{player}</div>
+                      <div style={{...S.pickPlayerName,marginBottom:6}}>{player}</div>
                       {resolved ? (
                         <div style={{fontSize:12,color:"#888"}}>{tbVal ? `Minute ${tbVal}` : <span style={{color:"#333"}}>no guess</span>}</div>
                       ) : (
@@ -1066,7 +1068,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
               </div>
               {isEditing&&(
                 <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10}}>
-                  <span style={{fontSize:9,letterSpacing:2,color:"#444",textTransform:"uppercase",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Correct minute:</span>
+                  <span style={{...S.eyebrow,color:"#555"}}>Correct minute</span>
                   <input type="number" min="1" max="120"
                     style={{...S.editInput,width:72,padding:"4px 8px",fontSize:12,flex:"none"}}
                     placeholder="e.g. 23"
@@ -1083,7 +1085,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                 let best = Infinity;
                 tbEntries.forEach(([,v])=>{ const d=Math.abs(parseFloat(v)-adminMin); if(d<best) best=d; });
                 const tbWinner = tbEntries.filter(([,v])=>Math.abs(parseFloat(v)-adminMin)===best).map(([p])=>p);
-                return <div style={{marginTop:8,fontSize:11,color:"#a8e031",fontWeight:700}}>⚡ Tiebreaker: {tbWinner.join(" & ")} (closest to min {adminMin})</div>;
+                return <div style={{marginTop:8,fontSize:11,color:"#a8e031",fontWeight:700}}>Tiebreaker won by {tbWinner.join(" & ")} — closest to minute {adminMin}</div>;
               })()}
             </div>
           )}
@@ -1109,12 +1111,12 @@ function FixturesTab({ game }) {
         return (
           <div key={round.id} style={S.fixtureSection}>
             <div style={S.fixtureSectionHeader} onClick={()=>setOpenRound(isOpen?null:round.id)}>
-              <div>
+              <div style={{minWidth:0}}>
                 <span style={S.roundStage}>{wcRound.stage}</span>
                 <span style={S.fixtureSectionTitle}>{wcRound.label}</span>
               </div>
-              <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                <span style={S.deadlineBadge}>⏰ First KO: {wcRound.fixtures?.[0]?.[2]} {wcRound.fixtures?.[0]?.[3]}</span>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                <span style={S.deadlineBadge}>First KO {wcRound.fixtures?.[0]?.[2]} {wcRound.fixtures?.[0]?.[3]}</span>
                 <span style={S.expandChevron}>{isOpen?"▲":"▼"}</span>
               </div>
             </div>
@@ -1195,8 +1197,8 @@ function MoneyTab({ state }) {
                 {actualEntrants.length} entered · Pot: <strong style={{color:"#a8e031"}}>£{pot}</strong>
                 {game.rollover>0&&<span style={{color:"#a8e031"}}> (incl. £{game.rollover} rollover)</span>}
               </span>
-              <span style={{fontSize:11,color:game.complete?(game.winners.length>0?"#4caf50":"#f59e0b"):"#6b7280"}}>
-                {game.complete?(game.winners.length>0?`🏆 ${game.winners.join(", ")} won £${Math.floor(pot/game.winners.length)}`:"🔁 Rollover"):"In progress"}
+              <span style={{fontSize:11,color:game.complete?(game.winners.length>0?"#a8e031":"#f59e0b"):"#6b7280"}}>
+                {game.complete?(game.winners.length>0?`${game.winners.join(", ")} won £${Math.floor(pot/game.winners.length)}`:"Rolled over"):"In progress"}
               </span>
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:4,padding:"8px 12px"}}>
@@ -1205,12 +1207,12 @@ function MoneyTab({ state }) {
                 const won = game.complete && game.winners.includes(p);
                 return (
                   <span key={p} style={{
-                    fontSize:10,padding:"3px 8px",borderRadius:12,
-                    background: won?"#0a150a":entered?"rgba(76,175,80,0.1)":"rgba(100,100,100,0.1)",
-                    border: won?"1px solid #a8e031":entered?"1px solid rgba(76,175,80,0.2)":"1px solid #222",
+                    fontSize:10,padding:"3px 9px",borderRadius:2,letterSpacing:0.3,
+                    background: won?"rgba(168,224,49,0.1)":entered?"#1a1b22":"transparent",
+                    border: won?"1px solid #a8e031":entered?"1px solid #1e1f26":"1px solid #161616",
                     color: won?"#a8e031":entered?"#9ca3af":"#444",
                   }}>
-                    {p}{won?" 🏆":entered?" -£2":" –"}
+                    {p}{won?` · £${Math.floor(pot/game.winners.length)}`:entered?` · -£${ENTRY_FEE}`:" · –"}
                   </span>
                 );
               })}
@@ -1232,10 +1234,10 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
 
   const cats = ["15pts","Groups","5pts","Tiebreaker"];
   const catLabels = {
-    "15pts":"⭐ 15 Points Each",
-    "Groups":"🏟️ Group Winners — 5 Points Each",
-    "5pts":"5 Points Each",
-    "Tiebreaker":"🎯 Tiebreaker"
+    "15pts":"15 points each",
+    "Groups":"Group winners — 5 points each",
+    "5pts":"5 points each",
+    "Tiebreaker":"Tiebreaker"
   };
 
   const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).map(s=>s.toLowerCase().trim());
@@ -1278,12 +1280,12 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
         <div style={{display:"flex",gap:6,flexShrink:0}}>
           <button onClick={()=>{ if(adminMode){setAdminMode(false);}else{const pin=prompt("Enter admin PIN:");if(pin==="4816")setAdminMode(true);}}}
             style={{...S.editBtn, background: adminMode?"#E61D25":"transparent", color: adminMode?"#fff":"#9ca3af"}}>
-            {adminMode ? "✓ ADMIN" : "ADMIN"}
+            {adminMode ? "Admin on" : "Admin"}
           </button>
           {adminMode&&(
             <button onClick={togglePredictorLock}
-              style={{...S.editBtn, color: pred.locked?"#a8e031":"#3a3a3a"}}>
-              {pred.locked ? "🔒 LOCKED" : "🔓 OPEN"}
+              style={{...S.editBtn, color: pred.locked?"#a8e031":"#9ca3af", borderColor: pred.locked?"rgba(168,224,49,0.4)":"#1e1f26"}}>
+              {pred.locked ? "Locked" : "Open"}
             </button>
           )}
         </div>
@@ -1317,9 +1319,9 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
             ))}
           </div>
           {pred.locked&&(
-            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:10,padding:"8px 12px",background:"#100a0a",border:"1px solid #2a1010",borderRadius:2}}>
-              <span style={{fontSize:10,color:"#E61D25",fontWeight:700,letterSpacing:1}}>🔒 LOCKED</span>
-              <span style={{fontSize:10,color:"#555",letterSpacing:0.5}}>No more picks accepted</span>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,padding:"9px 12px",background:"#100a0a",border:"1px solid #2a1010",borderRadius:2}}>
+              <span style={{fontSize:9,color:"#E61D25",fontWeight:700,letterSpacing:2,textTransform:"uppercase"}}>Locked</span>
+              <span style={{fontSize:11,color:"#777",letterSpacing:0.3}}>No more picks accepted</span>
             </div>
           )}
         </div>
@@ -1328,7 +1330,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
       {/* Overview — shown when locked and no player selected */}
       {!adminMode&&!selectedPlayer&&pred.locked&&(
         <div style={{marginBottom:16}}>
-          <div style={{fontSize:9,letterSpacing:3,color:"#E61D25",fontWeight:700,textTransform:"uppercase",marginBottom:12,fontFamily:"'DM Sans',sans-serif"}}>EVERYONE&apos;S PICKS</div>
+          <div style={{...S.eyebrow,color:"#E61D25",marginBottom:12}}>Everyone&apos;s picks</div>
           {predEntrants.length===0&&<div style={{color:"#444",fontSize:11,padding:"8px 0"}}>No picks submitted yet.</div>}
           {cats.filter(c=>c!=="Tiebreaker").map(cat=>{
             const qs = PREDICTOR_QUESTIONS.filter(q=>q.cat===cat&&q.id!=="tiebreak");
@@ -1653,21 +1655,21 @@ function ResetPanel() {
   const [confirming, setConfirming] = useState(false);
   return confirming ? (
     <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-      <span style={{fontSize:12,color:"#e53935"}}>This will wipe ALL data for everyone.</span>
+      <span style={{fontSize:12,color:"#e53935"}}>This will wipe all data for everyone.</span>
       <button onClick={async()=>{ await fetch("/api/state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(null),
     }); window.location.reload(); }}
-        style={{...S.removeBtn,padding:"5px 12px",fontWeight:700}}>✓ YES, RESET</button>
+        style={{...S.removeBtn,padding:"5px 12px",fontWeight:700,color:"#e53935",borderColor:"#e53935"}}>Yes, reset</button>
       <button onClick={()=>setConfirming(false)}
         style={{background:"transparent",border:"1px solid #374151",color:"#9ca3af",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:11}}>
-        CANCEL
+        Cancel
       </button>
     </div>
   ) : (
     <button style={{...S.removeBtn,padding:"8px 16px"}} onClick={()=>setConfirming(true)}>
-      RESET ALL DATA
+      Reset all data
     </button>
   );
 }
@@ -1677,9 +1679,9 @@ function SettingsTab({ state, update, newPlayerName, setNewPlayerName, addPlayer
     <div style={S.settings}>
       <h2 style={S.sectionTitle}>SETTINGS</h2>
       <div style={S.infoBox}>
-        <strong style={{color:"#E61D25"}}>🌐 Live & Shared</strong>
-        <p style={{margin:"6px 0 0",fontSize:12,color:"#9ca3af",lineHeight:1.5}}>
-          Share this URL in your WhatsApp group. All picks and results sync within ~5 seconds for everyone.
+        <strong style={{...S.eyebrow,color:"#E61D25",display:"block",marginBottom:6}}>Live &amp; shared</strong>
+        <p style={{margin:0,fontSize:12,color:"#9ca3af",lineHeight:1.5}}>
+          Share this URL in your WhatsApp group. All picks and results sync within about five seconds for everyone.
         </p>
       </div>
       <div style={S.settingGroup}>
@@ -1745,7 +1747,8 @@ const S = {
   roundStage:{fontSize:8,color:"#E61D25",letterSpacing:4,display:"block",marginBottom:5,textTransform:"uppercase",fontWeight:700},
   roundLabel:{margin:0,fontSize:26,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2},
   roundDeadline:{fontSize:10,color:"#666",marginTop:4,display:"block",letterSpacing:0.5},
-  resolvedBadge:{background:"#a8e031",color:"#080808",borderRadius:2,padding:"3px 10px",fontSize:8,fontWeight:700,flexShrink:0,textTransform:"uppercase",letterSpacing:2,alignSelf:"flex-start"},
+  resolvedBadge:{background:"#a8e031",color:"#080808",borderRadius:2,padding:"3px 10px",fontSize:8,fontWeight:700,flexShrink:0,textTransform:"uppercase",letterSpacing:2,alignSelf:"flex-start",fontFamily:"'DM Sans',sans-serif"},
+  lockedBadge:{background:"#E61D25",color:"#fff",borderRadius:2,padding:"3px 10px",fontSize:8,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",flexShrink:0,alignSelf:"flex-start"},
   expandChevron:{color:"#2e2f38",fontSize:10,flexShrink:0,marginTop:6},
   roundNote:{padding:"10px 16px",background:"#0b0c10",fontSize:11,color:"#777",borderBottom:"1px solid #1e1f26",lineHeight:1.5},
   editBtn:{background:"transparent",border:"1px solid #1e1f26",color:"#3a3b45",borderRadius:2,padding:"4px 12px",cursor:"pointer",fontSize:8,letterSpacing:2.5,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
@@ -1761,16 +1764,14 @@ const S = {
   pickPlayerName:{fontSize:9,fontWeight:700,color:"#888",letterSpacing:2,textTransform:"uppercase",marginBottom:1,fontFamily:"'DM Sans',sans-serif"},
   elimBadge:{fontSize:7,background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 5px",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"},
   pickSelect:{width:"100%",background:"transparent",border:"1px solid #2a2a2a",color:"#fff",borderRadius:2,padding:"5px 8px",fontSize:14,outline:"none",marginBottom:0,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1},
-  pickDisplay:{fontSize:14,color:"#fff",marginBottom:0,minHeight:22,fontWeight:600},
   outcomeRow:{display:"flex",gap:4,marginTop:2},
   outcomeBtn:{flex:1,padding:"5px 0",background:"transparent",border:"1px solid #1e1f26",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.5,transition:"all 0.1s",fontFamily:"'DM Sans',sans-serif"},
   resultBar:{padding:"9px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26",color:"#a8e031",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontWeight:700},
 
   fixtureSection:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,marginBottom:10,overflow:"hidden",width:"100%"},
   fixtureSectionHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"13px 16px",cursor:"pointer",gap:8,borderBottom:"1px solid #1e1f26"},
-  fixtureSectionTitle:{fontSize:18,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},
-  fixtureNote:{padding:"10px 16px",background:"#0b0c10",fontSize:11,color:"#777",borderBottom:"1px solid #1e1f26",lineHeight:1.6},
-  deadlineBadge:{background:"transparent",color:"#E61D25",border:"1px solid #E61D25",borderRadius:2,padding:"3px 7px",fontSize:7,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",letterSpacing:0.5,textTransform:"uppercase"},
+  fixtureSectionTitle:{fontSize:22,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginTop:1},
+  deadlineBadge:{background:"transparent",color:"#E61D25",border:"1px solid #E61D25",borderRadius:2,padding:"3px 8px",fontSize:7,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",letterSpacing:1,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
   fixtureRow:{display:"grid",gridTemplateColumns:"76px 1fr 14px 1fr",alignItems:"center",gap:6,padding:"8px 14px",borderBottom:"1px solid #111318",boxSizing:"border-box",width:"100%"},
   fixtureDate:{fontSize:10,color:"#666",letterSpacing:0.3},
   fixtureTeam:{fontSize:13,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},
@@ -1797,15 +1798,17 @@ const S = {
   settings:{},
   infoBox:{background:"#13141a",borderLeft:"3px solid #E61D25",padding:"14px 16px",marginBottom:14},
   settingGroup:{background:"#13141a",border:"1px solid #1e1f26",borderRadius:3,padding:"16px",marginBottom:10},
-  settingGroupTitle:{fontSize:8,letterSpacing:4,color:"#E61D25",margin:"0 0 12px",fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
+  settingGroupTitle:{fontSize:9,letterSpacing:3,color:"#E61D25",margin:"0 0 12px",fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
   playerRow:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1a1b22"},
   editInput:{background:"#1a1b22",border:"1px solid #1e1f26",color:"#fff",borderRadius:2,padding:"8px 12px",fontSize:13,outline:"none",flex:1,fontFamily:"'DM Sans',sans-serif"},
   addBtn:{background:"#E61D25",color:"#fff",border:"none",borderRadius:2,padding:"8px 18px",cursor:"pointer",fontWeight:700,letterSpacing:2,fontFamily:"'DM Sans',sans-serif",fontSize:10,textTransform:"uppercase"},
   removeBtn:{background:"transparent",border:"1px solid #1e1f26",color:"#3a3b45",borderRadius:2,padding:"5px 10px",cursor:"pointer",fontSize:11},
 
   // ── Predictor ─────────────────────────────────────────────────────────────
+  // Shared "eyebrow" label — small uppercase letter-spaced caption used app-wide
+  eyebrow:{fontSize:9,letterSpacing:3,fontWeight:700,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
   predHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:16},
-  predCatHeader:{fontSize:8,letterSpacing:3,color:"#444",padding:"14px 0 8px",borderBottom:"1px solid #1e1f26",marginBottom:10,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
+  predCatHeader:{fontSize:9,letterSpacing:3,color:"#666",padding:"14px 0 8px",borderBottom:"1px solid #1e1f26",marginBottom:10,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
   predRow:{background:"#13141a",borderBottom:"1px solid #1a1b22",padding:"12px 0",borderLeft:"3px solid transparent"},
   predPtsBadge:{background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 7px",fontSize:8,fontWeight:700,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
 
@@ -1813,21 +1816,14 @@ const S = {
   predPlayerBtn:{padding:"5px 12px",borderRadius:2,border:"1px solid",cursor:"pointer",fontSize:9,fontFamily:"'DM Sans',sans-serif",letterSpacing:2,fontWeight:700,textTransform:"uppercase",transition:"all 0.1s"},
 
   // Overview cards
-  overviewCatHeader:{fontSize:8,letterSpacing:3,color:"#444",fontWeight:700,textTransform:"uppercase",marginBottom:8,paddingBottom:6,borderBottom:"1px solid #1a1b22",fontFamily:"'DM Sans',sans-serif"},
+  overviewCatHeader:{fontSize:9,letterSpacing:3,color:"#666",fontWeight:700,textTransform:"uppercase",marginBottom:8,paddingBottom:6,borderBottom:"1px solid #1a1b22",fontFamily:"'DM Sans',sans-serif"},
   overviewQLabel:{fontSize:10,color:"#555",marginBottom:1,letterSpacing:0.5,fontFamily:"'DM Sans',sans-serif",paddingBottom:4},
   overviewPlayerName:{fontSize:8,fontWeight:700,color:"#555",letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
   overviewPickValue:{fontSize:16,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,lineHeight:1.1},
 
   // ── Leaderboard ───────────────────────────────────────────────────────────
   lbRow:{display:"flex",alignItems:"center",gap:12,padding:"14px 0",borderBottom:"1px solid #1a1b22"},
-  lbRowWinner:{borderLeft:"3px solid #a8e031",paddingLeft:12},
-  lbRowAlive:{},
-  lbRowElim:{opacity:0.3},
   lbRank:{width:28,fontSize:16,fontWeight:400,color:"#222",textAlign:"center",fontFamily:"'Bebas Neue',sans-serif"},
-  lbName:{flex:1,fontSize:15,fontWeight:700,color:"#fff"},
-  lbStatus:{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",fontWeight:600},
-  lbStat:{fontSize:10,color:"#333",minWidth:48,textAlign:"right"},
-  lbPot:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:18,padding:"16px 18px",background:"#E61D25",borderRadius:3},
 
   toast:{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#fff",color:"#080808",padding:"10px 24px",borderRadius:2,fontWeight:700,letterSpacing:3,fontSize:10,zIndex:999,boxShadow:"0 8px 40px rgba(0,0,0,0.7)",whiteSpace:"nowrap",textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
 };
