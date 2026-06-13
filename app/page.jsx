@@ -1138,13 +1138,11 @@ function FixturesTab({ game, matchResults, fixtureOverrides }) {
                   const homeWon=hasScore&&result.h>result.a;
                   const awayWon=hasScore&&result.a>result.h;
                   return (
-                    <div key={i} style={{display:"grid",gridTemplateColumns:"48px 1fr 30px 1fr",alignItems:"center",gap:4,padding:"7px 8px",borderBottom:"1px solid #111318",boxSizing:"border-box",width:"100%",overflow:"hidden"}}>
-                      <span style={{fontSize:9,color:"#666",lineHeight:1.4,flexShrink:0}}><span style={{display:"block"}}>{date}</span><span style={{display:"block"}}>{time.replace(" BST","")}</span></span>
-                      <span style={{fontSize:11,color:hasScore?(homeWon?"#a8e031":"#666"):"#ccc",fontWeight:homeWon?700:400,textAlign:"right",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{home} {FLAG[home]||"🏳️"}</span>
-                      <span style={{fontSize:hasScore?11:9,color:hasScore?"#fff":"#444",fontFamily:hasScore?"'Bebas Neue',sans-serif":"inherit",textAlign:"center",letterSpacing:0,flexShrink:0}}>
-                        {hasScore?`${result.h}-${result.a}`:"v"}
-                      </span>
-                      <span style={{fontSize:11,color:hasScore?(awayWon?"#a8e031":"#666"):"#ccc",fontWeight:awayWon?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{FLAG[away]||"🏳️"} {away}</span>
+                    <div key={i} style={{display:"flex",alignItems:"center",padding:"9px 14px",borderBottom:"1px solid #111318",boxSizing:"border-box",width:"100%"}}>
+                      <span style={{width:52,flexShrink:0,fontSize:9,color:"#666",lineHeight:1.4}}><span style={{display:"block"}}>{date}</span><span style={{display:"block"}}>{time.replace(" BST","")}</span></span>
+                      <span style={{flex:1,minWidth:0,textAlign:"right",fontSize:12,color:hasScore?(homeWon?"#a8e031":"#888"):"#ddd",fontWeight:homeWon?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{home} {FLAG[home]||"🏳️"}</span>
+                      <span style={{width:48,flexShrink:0,textAlign:"center",fontSize:hasScore?13:10,color:hasScore?"#fff":"#555",fontFamily:hasScore?"'Bebas Neue',sans-serif":"inherit",letterSpacing:hasScore?1:0}}>{hasScore?`${result.h}-${result.a}`:"v"}</span>
+                      <span style={{flex:1,minWidth:0,textAlign:"left",fontSize:12,color:hasScore?(awayWon?"#a8e031":"#888"):"#ddd",fontWeight:awayWon?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{FLAG[away]||"🏳️"} {away}</span>
                     </div>
                   );
                 })}
@@ -1797,7 +1795,7 @@ const S = {
   navBtn:{flex:1,padding:"11px 0",background:"transparent",border:"none",color:"#666",fontFamily:"'DM Sans',sans-serif",fontSize:9,letterSpacing:2.5,cursor:"pointer",textTransform:"uppercase",fontWeight:700,borderBottom:"3px solid transparent"},
   navBtnActive:{color:"#fff",borderBottom:"3px solid #E61D25",background:"#0d0d0d"},
 
-  main:{padding:"14px 14px",maxWidth:900,margin:"0 auto",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},
+  main:{padding:"14px 14px",maxWidth:900,width:"100%",margin:"0 auto",flex:1,overflowY:"auto",boxSizing:"border-box",WebkitOverflowScrolling:"touch"},
 
   winnerBanner:{display:"flex",alignItems:"center",gap:18,background:"#E61D25",padding:"18px 20px",marginBottom:14,borderRadius:3},
   rolloverBanner:{background:"#13141a",borderLeft:"3px solid #a8e031",padding:"10px 14px",marginBottom:10,fontSize:10,color:"#a8e031",letterSpacing:2,textTransform:"uppercase",fontWeight:700},
