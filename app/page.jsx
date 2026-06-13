@@ -1205,17 +1205,10 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                       )}
                     </>
                   ):(
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:28,paddingTop:1}}>
-                      {pick?(
-                        <>
-                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:1,color:"#444",lineHeight:1}}>{pick}</span>
-                          <span style={{fontSize:28,lineHeight:1,opacity:0.3}}>{FLAG[pick]||"🏳️"}</span>
-                        </>
-                      ):(
-                        <span style={{fontSize:9,fontWeight:700,color:"#333",letterSpacing:1}}>
-                          {elimMap[player]&&elimMap[player]>0?`OUT R${elimMap[player]}`:"OUT"}
-                        </span>
-                      )}
+                    <div style={{display:"flex",alignItems:"center",minHeight:28,paddingTop:1}}>
+                      <span style={{fontSize:9,fontWeight:700,color:"#333",letterSpacing:1}}>
+                        {elimMap[player]&&elimMap[player]>0?`OUT R${elimMap[player]}`:"OUT"}
+                      </span>
                     </div>
                   )}
                 </div>
