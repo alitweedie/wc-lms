@@ -902,6 +902,100 @@ function CloseRoundPanel({ unpickedAlive, onClose }) {
   );
 }
 
+function RoundSummaryButton({ round, wcRound, survivors, ousted, aliveAtStart }) {
+  const [state, setState] = useState("idle"); // idle | loading | ready | copied
+  const [summary, setSummary] = useState("");
+
+  // Only fully settled when every alive player's pick has an outcome.
+  const fullySettled = isRoundFullySettled(round, aliveAtStart);
+  if (!fullySettled) return null;
+
+  async function generate() {
+    setState("loading");
+
+    // Build the factual base first (always works, even if AI call fails).
+    const survivorLine = survivors.length
+      ? `✅ Still in (${survivors.length}): ${survivors.join(", ")}`
+      : `✅ Still in: nobody — everyone's out!`;
+    const oustedLine = ousted.length
+      ? `❌ Knocked out (${ousted.length}): ${ousted.join(", ")}`
+      : `❌ Knocked out: nobody this round`;
+
+    // Picks with outcomes, for the AI prompt
+    const pickLines = aliveAtStart.map(p => {
+      const pk = round.picks[p];
+      const o = round.outcomes[p];
+      if (!pk) return `${p}: no pick`;
+      return `${p} picked ${pk} (${o||"pending"})`;
+    }).join("\n");
+
+    let banter = "";
+    try {
+      const res = await fetch("/api/banter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roundLabel: wcRound?.label || "this round",
+          pickLines,
+          survivors,
+          ousted,
+        }),
+      });
+      const data = await res.json();
+      banter = (data.banter || "").trim();
+    } catch (e) {
+      banter = ""; // fail silently — factual summary still useful
+    }
+
+    const msg = [
+      `🏆 LMS Update — ${wcRound?.label||"Round"}`,
+      ``,
+      survivorLine,
+      oustedLine,
+      ``,
+      banter || null,
+      banter ? `` : null,
+      `${survivors.length} still standing.`,
+    ].filter(l=>l!==null).join("\n");
+
+    setSummary(msg);
+    setState("ready");
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(summary);
+      setState("copied");
+      setTimeout(()=>setState("ready"), 2000);
+    } catch (e) {
+      setState("ready");
+    }
+  }
+
+  return (
+    <div style={{padding:"12px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26"}}>
+      {state==="idle"&&(
+        <button onClick={e=>{e.stopPropagation(); generate();}}
+          style={{width:"100%",background:"#1a1b22",border:"1px solid #2a2c36",color:"#a8e031",borderRadius:3,padding:"10px 0",fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
+          Generate round summary
+        </button>
+      )}
+      {state==="loading"&&(
+        <div style={{textAlign:"center",color:"#666",fontSize:11,padding:"10px 0",fontFamily:"'DM Sans',sans-serif"}}>Writing summary…</div>
+      )}
+      {(state==="ready"||state==="copied")&&(
+        <div>
+          <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",background:"#0e0f14",border:"1px solid #1e1f26",borderRadius:3,padding:12,fontSize:12,color:"#ddd",fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,margin:"0 0 8px"}}>{summary}</pre>
+          <button onClick={e=>{e.stopPropagation(); copy();}}
+            style={{width:"100%",background:state==="copied"?"#a8e031":"#E61D25",border:"none",color:state==="copied"?"#0e0f14":"#fff",borderRadius:3,padding:"10px 0",fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
+            {state==="copied"?"Copied — paste into WhatsApp":"Copy for WhatsApp"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, isFirstRound, isEditing, setEditing, roundIndex }) {
   const resolved = roundResolved(round);
   const survivors = aliveAtStart.filter(p=>round.outcomes[p]===OUTCOME.WIN);
@@ -1051,6 +1145,14 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
             <div style={S.resultBar}>
               {survivors.length} survive{survivors.length>0?` · ${survivors.join(", ")}`:""} · {ousted.length} out
             </div>
+          )}
+
+          {resolved&&(
+            <RoundSummaryButton
+              round={round} wcRound={wcRound}
+              survivors={survivors} ousted={ousted}
+              aliveAtStart={aliveAtStart}
+            />
           )}
 
           {wcRound?.hasTiebreaker&&(
