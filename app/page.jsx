@@ -1101,7 +1101,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
 function FixturesTab({ game, matchResults, fixtureOverrides }) {
   const [openRound, setOpenRound] = useState(game.rounds[0]?.id||1);
   return (
-    <div>
+    <div style={{width:"100%",boxSizing:"border-box"}}>
       <h2 style={S.sectionTitle}>FIXTURES BY ROUND</h2>
       <p style={{fontSize:11,color:"#6b7280",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>All times BST. Use these to decide which team to pick.</p>
       {game.rounds.map(round=>{
