@@ -506,6 +506,7 @@ export default function App() {
   const [tab, setTab] = useState("tracker");
   const [activeGameIdx, setActiveGameIdx] = useState(0);
   const [editingRound, setEditingRound] = useState(null);
+  const [adminMode, setAdminMode] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState("");
   const [toast, setToast] = useState(null);
   const stateRef = useRef(null);
@@ -555,6 +556,11 @@ export default function App() {
   const setPick = (gi, roundId, player, team) => update(s => {
     const r = s.games[gi].rounds.find(r=>r.id===roundId);
     if (r) { r.picks[player]=team; r.outcomes[player]=OUTCOME.PENDING; }
+  });
+
+  const setRoundSummary = (gi, roundId, summary) => update(s => {
+    const r = s.games[gi].rounds.find(r=>r.id===roundId);
+    if (r) { r.summary = summary; r.summaryAt = Date.now(); }
   });
 
   const closeRound = (gi, roundId) => update(s => {
@@ -794,6 +800,8 @@ export default function App() {
           <TrackerTab rounds={trackerRounds} game={game} gi={gi} state={state}
             elimMap={elimMap} entrants={entrants} setPick={setPick} setOutcome={setOutcome}
             closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker}
+            setRoundSummary={setRoundSummary}
+            adminMode={adminMode} setAdminMode={setAdminMode}
             editingRound={editingRound} setEditingRound={setEditingRound}/>
         )}
         {tab==="fixtures"&&<FixturesTab game={game} matchResults={state.matchResults||{}} fixtureOverrides={state.fixtureOverrides||{}}/>}
@@ -821,7 +829,39 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRACKER
 // ═══════════════════════════════════════════════════════════════════════════════
-function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, editingRound, setEditingRound }) {
+function PinModal({ onSuccess, onCancel }) {
+  const [val, setVal] = useState("");
+  const [error, setError] = useState(false);
+  const check = (v) => {
+    if (v === "4816") { onSuccess(); }
+    else { setError(true); setVal(""); setTimeout(()=>setError(false), 1000); }
+  };
+  return (
+    <div onClick={onCancel} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#13141a",border:"1px solid #2a2c36",borderRadius:8,padding:"24px 28px",width:240,display:"flex",flexDirection:"column",gap:14}}>
+        <p style={{margin:0,fontSize:13,fontWeight:700,color:"#fff",fontFamily:"'DM Sans',sans-serif",letterSpacing:1,textTransform:"uppercase",textAlign:"center"}}>Enter Admin PIN</p>
+        <input
+          autoFocus
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          value={val}
+          onChange={e=>{ setVal(e.target.value); setError(false); }}
+          onKeyDown={e=>{ if(e.key==="Enter") check(val); if(e.key==="Escape") onCancel(); }}
+          style={{width:"100%",boxSizing:"border-box",background:"#0e0f14",border:`2px solid ${error?"#e53935":"#2a2c36"}`,borderRadius:4,padding:"10px 12px",color:"#fff",fontSize:20,fontFamily:"monospace",textAlign:"center",outline:"none",letterSpacing:6,transition:"border-color 0.2s"}}
+          placeholder="••••"
+        />
+        {error&&<p style={{margin:0,fontSize:11,color:"#e53935",textAlign:"center",fontFamily:"'DM Sans',sans-serif"}}>Wrong PIN — try again</p>}
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onCancel} style={{flex:1,padding:"8px 0",background:"transparent",border:"1px solid #2a2c36",borderRadius:4,color:"#9ca3af",fontSize:12,fontWeight:700,fontFamily:"'DM Sans',sans-serif",cursor:"pointer",letterSpacing:1}}>CANCEL</button>
+          <button onClick={()=>check(val)} style={{flex:1,padding:"8px 0",background:"#E61D25",border:"none",borderRadius:4,color:"#fff",fontSize:12,fontWeight:700,fontFamily:"'DM Sans',sans-serif",cursor:"pointer",letterSpacing:1}}>OK</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, setRoundSummary, adminMode, setAdminMode, editingRound, setEditingRound }) {
   return (
     <div>
       {rounds.map((round) => {
@@ -833,6 +873,8 @@ function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOu
           <RoundCard key={round.id} round={round} wcRound={wcRound} game={game} gi={gi}
             state={state} aliveAtStart={aliveAtStart} elimMap={elimMap} entrants={entrants}
             setPick={setPick} setOutcome={setOutcome} closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker} isFirstRound={isFirstRound}
+            setRoundSummary={setRoundSummary}
+            adminMode={adminMode} setAdminMode={setAdminMode}
             isEditing={editingRound===`${gi}-${round.id}`}
             setEditing={v=>setEditingRound(v?`${gi}-${round.id}`:null)}
             roundIndex={realRoundIdx}/>
@@ -902,18 +944,17 @@ function CloseRoundPanel({ unpickedAlive, onClose }) {
   );
 }
 
-function RoundSummaryButton({ round, wcRound, survivors, ousted, aliveAtStart }) {
-  const [state, setState] = useState("idle"); // idle | loading | ready | copied
-  const [summary, setSummary] = useState("");
+function RoundSummaryButton({ round, wcRound, gi, survivors, ousted, aliveAtStart, setRoundSummary, adminMode }) {
+  const [phase, setPhase] = useState("idle"); // idle | loading | copied
+  const stored = round.summary; // shared, persisted summary (same for everyone)
 
-  // Only fully settled when every alive player's pick has an outcome.
+  // Only available once every alive player's pick has an outcome.
   const fullySettled = isRoundFullySettled(round, aliveAtStart);
   if (!fullySettled) return null;
 
   async function generate() {
-    setState("loading");
+    setPhase("loading");
 
-    // Build the factual base first (always works, even if AI call fails).
     const survivorLine = survivors.length
       ? `✅ Still in (${survivors.length}): ${survivors.join(", ")}`
       : `✅ Still in: nobody — everyone's out!`;
@@ -921,7 +962,6 @@ function RoundSummaryButton({ round, wcRound, survivors, ousted, aliveAtStart })
       ? `❌ Knocked out (${ousted.length}): ${ousted.join(", ")}`
       : `❌ Knocked out: nobody this round`;
 
-    // Picks with outcomes, for the AI prompt
     const pickLines = aliveAtStart.map(p => {
       const pk = round.picks[p];
       const o = round.outcomes[p];
@@ -931,20 +971,41 @@ function RoundSummaryButton({ round, wcRound, survivors, ousted, aliveAtStart })
 
     let banter = "";
     try {
-      const res = await fetch("/api/banter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roundLabel: wcRound?.label || "this round",
-          pickLines,
-          survivors,
-          ousted,
-        }),
-      });
-      const data = await res.json();
-      banter = (data.banter || "").trim();
+      const isVercel = typeof window !== "undefined" && window.location.hostname.includes("vercel.app");
+      let res;
+      if (isVercel) {
+        res = await fetch("/api/banter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roundLabel: wcRound?.label || "this round", pickLines, survivors, ousted }),
+        });
+        const data = await res.json();
+        banter = (data.banter || "").trim();
+      } else {
+        res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: 1000,
+            messages: [{ role: "user", content:
+`You're the merciless commentator for a 9-mate World Cup Last Man Standing WhatsApp group. These are close lads who give each other brutal, sweary stick — so go in HARD and don't hold back. Write 2-3 short, savage, very funny lines absolutely tearing into how this round went. British English, dry and filthy, proper lads' group-chat piss-taking. Swear freely — fuck, shit, knobhead, bellend, mug, etc. are all fair game and welcome. Brutally mock the people knocked out: their dogshit picks, their judgement, their misplaced confidence. Keep it about the football and the picks though — savage their decisions, not genuinely personal stuff. No emoji. Punchy and quotable. Don't list everyone — just absolutely bury the most laughable picks and grudgingly give the survivors a nod.
+
+Round: ${wcRound?.label || "this round"}
+
+${pickLines}
+
+Survivors: ${survivors.join(", ") || "none"}
+Knocked out: ${ousted.join(", ") || "none"}
+
+Return ONLY the banter lines, nothing else.` }],
+          }),
+        });
+        const data = await res.json();
+        banter = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+      }
     } catch (e) {
-      banter = ""; // fail silently — factual summary still useful
+      banter = "";
     }
 
     const msg = [
@@ -958,51 +1019,57 @@ function RoundSummaryButton({ round, wcRound, survivors, ousted, aliveAtStart })
       `${survivors.length} still standing.`,
     ].filter(l=>l!==null).join("\n");
 
-    setSummary(msg);
-    setState("ready");
+    // Save to shared state — persists for everyone, one-time generation.
+    setRoundSummary(gi, round.id, msg);
+    setPhase("idle");
   }
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(summary);
-      setState("copied");
-      setTimeout(()=>setState("ready"), 2000);
-    } catch (e) {
-      setState("ready");
-    }
+      await navigator.clipboard.writeText(stored);
+      setPhase("copied");
+      setTimeout(()=>setPhase("idle"), 2000);
+    } catch (e) {}
   }
 
   return (
     <div style={{padding:"12px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26"}}>
-      {state==="idle"&&(
+      {!stored&&phase==="idle"&&(
         <button onClick={e=>{e.stopPropagation(); generate();}}
           style={{width:"100%",background:"#1a1b22",border:"1px solid #2a2c36",color:"#a8e031",borderRadius:3,padding:"10px 0",fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
           Generate round summary
         </button>
       )}
-      {state==="loading"&&(
+      {phase==="loading"&&(
         <div style={{textAlign:"center",color:"#666",fontSize:11,padding:"10px 0",fontFamily:"'DM Sans',sans-serif"}}>Writing summary…</div>
       )}
-      {(state==="ready"||state==="copied")&&(
+      {stored&&phase!=="loading"&&(
         <div>
-          <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",background:"#0e0f14",border:"1px solid #1e1f26",borderRadius:3,padding:12,fontSize:12,color:"#ddd",fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,margin:"0 0 8px"}}>{summary}</pre>
+          <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",background:"#0e0f14",border:"1px solid #1e1f26",borderRadius:3,padding:12,fontSize:12,color:"#ddd",fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,margin:"0 0 8px"}}>{stored}</pre>
           <button onClick={e=>{e.stopPropagation(); copy();}}
-            style={{width:"100%",background:state==="copied"?"#a8e031":"#E61D25",border:"none",color:state==="copied"?"#0e0f14":"#fff",borderRadius:3,padding:"10px 0",fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
-            {state==="copied"?"Copied — paste into WhatsApp":"Copy for WhatsApp"}
+            style={{width:"100%",background:phase==="copied"?"#a8e031":"#E61D25",border:"none",color:phase==="copied"?"#0e0f14":"#fff",borderRadius:3,padding:"10px 0",fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
+            {phase==="copied"?"Copied — paste into WhatsApp":"Copy for WhatsApp"}
           </button>
+          {adminMode&&(
+            <button onClick={e=>{e.stopPropagation(); generate();}}
+              style={{display:"block",margin:"8px auto 0",background:"none",border:"none",color:"#555",fontSize:10,letterSpacing:1,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
+              ↻ Regenerate
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, isFirstRound, isEditing, setEditing, roundIndex }) {
+function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, setRoundSummary, adminMode, setAdminMode, isFirstRound, isEditing, setEditing, roundIndex }) {
   const resolved = roundResolved(round);
   const survivors = aliveAtStart.filter(p=>round.outcomes[p]===OUTCOME.WIN);
   const ousted = aliveAtStart.filter(p=>
     round.outcomes[p]===OUTCOME.LOSE||round.outcomes[p]===OUTCOME.DRAW||(resolved&&!round.picks[p]&&roundIndex>0)
   );
   const [expanded, setExpanded] = useState(!resolved && !game.complete);
+  const [pinEntry, setPinEntry] = useState(false);
   useEffect(()=>{ if (!resolved && !game.complete) setExpanded(true); },[resolved, game.complete]);
 
   const unpickedAlive = aliveAtStart.filter(p => {
@@ -1034,18 +1101,33 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
         <>
           {wcRound&&<div style={S.roundNote}>{wcRound.note}</div>}
           <div style={{padding:"4px 12px",borderBottom:"1px solid #1f2937",display:"flex",justifyContent:"flex-end",alignItems:"center",gap:8}}>
-            <button onClick={e=>{e.stopPropagation();setEditing(!isEditing);}} style={S.editBtn}>
-              {isEditing?"DONE":"EDIT"}
-            </button>
+            {!adminMode&&!pinEntry&&(
+              <button onClick={e=>{e.stopPropagation(); setPinEntry(true); setPinVal(""); setPinError(false);}}
+                style={S.editBtn}>
+                ADMIN
+              </button>
+            )}
+            {!adminMode&&pinEntry&&(
+              <PinModal
+                onSuccess={()=>{ setAdminMode(true); setPinEntry(false); }}
+                onCancel={()=>{ setPinEntry(false); }}
+              />
+            )}
+            {adminMode&&(
+              <button onClick={e=>{e.stopPropagation(); setAdminMode(false);}}
+                style={{...S.editBtn, background:"#E61D25", color:"#fff"}}>
+                ADMIN ON
+              </button>
+            )}
           </div>
 
-          {isEditing && canClose && (
+          {adminMode && canClose && (
             <CloseRoundPanel
               unpickedAlive={unpickedAlive}
               onClose={() => closeRound(gi, round.id)}
             />
           )}
-          {isEditing && resolved && (
+          {adminMode && resolved && (
             <ReopenRoundPanel onReopen={() => reopenRound(gi, round.id)}/>
           )}
 
@@ -1109,7 +1191,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                           )}
                         </div>
                       )}
-                      {pick&&isEditing&&(
+                      {pick&&adminMode&&(
                         <div style={S.outcomeRow}>
                           {[{val:OUTCOME.WIN,label:"W",color:"#a8e031"},{val:OUTCOME.DRAW,label:"D",color:"#a8e031"},{val:OUTCOME.LOSE,label:"L",color:"#e53935"}].map(({val,label,color})=>(
                             <button key={val}
@@ -1149,9 +1231,11 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
 
           {resolved&&(
             <RoundSummaryButton
-              round={round} wcRound={wcRound}
+              round={round} wcRound={wcRound} gi={gi}
               survivors={survivors} ousted={ousted}
               aliveAtStart={aliveAtStart}
+              setRoundSummary={setRoundSummary}
+              adminMode={adminMode}
             />
           )}
 
@@ -1181,7 +1265,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                   );
                 })}
               </div>
-              {isEditing&&(
+              {adminMode&&(
                 <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10}}>
                   <span style={{...S.eyebrow,color:"#555"}}>Correct minute</span>
                   <input type="number" min="1" max="120"
@@ -1362,6 +1446,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
   const pred = state.predictor || { picks:{}, answers:{}, locked:false };
   const [adminMode, setAdminMode] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [pinEntry, setPinEntry] = useState(false);
 
   const cats = ["15pts","Groups","5pts","Tiebreaker"];
   const catLabels = {
@@ -1408,11 +1493,21 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
             £{PREDICTOR_FEE} entry · {predEntrants.length} entered · Pot: <strong style={{color:"#a8e031"}}>£{pot}</strong>
           </p>
         </div>
-        <div style={{display:"flex",gap:6,flexShrink:0}}>
-          <button onClick={()=>{ if(adminMode){setAdminMode(false);}else{const pin=prompt("Enter admin PIN:");if(pin==="4816")setAdminMode(true);}}}
-            style={{...S.editBtn, background: adminMode?"#E61D25":"transparent", color: adminMode?"#fff":"#9ca3af"}}>
-            {adminMode ? "Admin on" : "Admin"}
-          </button>
+        <div style={{display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
+          {!adminMode&&!pinEntry&&(
+            <button onClick={()=>{ setPinEntry(true); }}
+              style={S.editBtn}>Admin</button>
+          )}
+          {!adminMode&&pinEntry&&(
+            <PinModal
+              onSuccess={()=>{ setAdminMode(true); setPinEntry(false); }}
+              onCancel={()=>{ setPinEntry(false); }}
+            />
+          )}
+          {adminMode&&(
+            <button onClick={()=>setAdminMode(false)}
+              style={{...S.editBtn, background:"#E61D25", color:"#fff"}}>Admin on</button>
+          )}
           {adminMode&&(
             <button onClick={togglePredictorLock}
               style={{...S.editBtn, color: pred.locked?"#a8e031":"#9ca3af", borderColor: pred.locked?"rgba(168,224,49,0.4)":"#1e1f26"}}>
@@ -1917,12 +2012,12 @@ const S = {
 
   roundCard:{background:"#13141a",borderRadius:3,marginBottom:10,overflow:"hidden",border:"1px solid #1e1f26"},
   roundCardResolved:{opacity:0.45},
-  roundHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid #1e1f26",cursor:"pointer",gap:8},
+  roundHeader:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid #1e1f26",cursor:"pointer",gap:8},
   roundStage:{fontSize:8,color:"#E61D25",letterSpacing:4,display:"block",marginBottom:5,textTransform:"uppercase",fontWeight:700},
   roundLabel:{margin:0,fontSize:26,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2},
   roundDeadline:{fontSize:10,color:"#666",marginTop:4,display:"block",letterSpacing:0.5},
   resolvedBadge:{background:"#a8e031",color:"#080808",borderRadius:2,padding:"3px 10px",fontSize:8,fontWeight:700,flexShrink:0,textTransform:"uppercase",letterSpacing:2,alignSelf:"flex-start",fontFamily:"'DM Sans',sans-serif"},
-  lockedBadge:{background:"#E61D25",color:"#fff",borderRadius:2,padding:"3px 10px",fontSize:8,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",flexShrink:0,alignSelf:"flex-start"},
+  lockedBadge:{background:"#E61D25",color:"#fff",borderRadius:2,padding:"3px 10px",fontSize:8,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",flexShrink:0,alignSelf:"center"},
   expandChevron:{color:"#2e2f38",fontSize:10,flexShrink:0,marginTop:6},
   roundNote:{padding:"10px 16px",background:"#0b0c10",fontSize:11,color:"#777",borderBottom:"1px solid #1e1f26",lineHeight:1.5},
   editBtn:{background:"transparent",border:"1px solid #1e1f26",color:"#3a3b45",borderRadius:2,padding:"4px 12px",cursor:"pointer",fontSize:8,letterSpacing:2.5,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
