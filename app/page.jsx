@@ -695,6 +695,19 @@ export default function App() {
     ? game.rounds.slice(0, lastResolvedIdx + 1)
     : game.rounds;
 
+  // Determine whether the most-advanced active round is FULLY settled.
+  // Within one matchday, games finish on different days, so a round can be
+  // partially resolved. We must not declare a survivor/winner until every
+  // still-alive player's pick in the current round has an outcome.
+  const currentRoundIdx = lastResolvedIdx >= 0 ? lastResolvedIdx : 0;
+  const currentRound = game.rounds[currentRoundIdx];
+  const aliveAtRoundStart = getAliveAtStart(game, state.players, currentRoundIdx);
+  const currentRoundSettled = currentRound
+    ? isRoundFullySettled(currentRound, aliveAtRoundStart)
+    : false;
+  // Only trust aliveNow for "winner" messaging once the round is fully settled.
+  const showOutcomeBanners = currentRoundSettled;
+
   return (
     <div style={S.root}>
       <header style={S.header}>
@@ -763,13 +776,13 @@ export default function App() {
         {tab==="tracker"&&game.rollover>0&&!game.rolledOver&&(
           <div style={S.rolloverBanner}>Rollover included — £{game.rollover} carried into this game's pot</div>
         )}
-        {tab==="tracker"&&!game.complete&&aliveNow.length===1&&(
+        {tab==="tracker"&&!game.complete&&showOutcomeBanners&&aliveNow.length===1&&(
           <div style={{background:"#E61D25",padding:"11px 18px",display:"flex",alignItems:"baseline",gap:12,flexShrink:0}}>
             <span style={{fontSize:22,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff",lineHeight:1}}>LAST MAN STANDING</span>
             <span style={{fontSize:12,color:"rgba(255,255,255,0.9)",fontWeight:700,letterSpacing:1}}>{aliveNow[0]}</span>
           </div>
         )}
-        {tab==="tracker"&&!game.complete&&aliveNow.length>1&&aliveNow.length<=3&&(
+        {tab==="tracker"&&!game.complete&&showOutcomeBanners&&aliveNow.length>1&&aliveNow.length<=3&&(
           <div style={{background:"#E61D25",padding:"9px 18px",display:"flex",alignItems:"center",flexShrink:0}}>
             <span style={{fontSize:20,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#fff",lineHeight:1}}>FINAL SHOWDOWN — {aliveNow.length} REMAINING</span>
           </div>
