@@ -1101,8 +1101,8 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
 function FixturesTab({ game, matchResults, fixtureOverrides }) {
   const [openRound, setOpenRound] = useState(game.rounds[0]?.id||1);
   return (
-    <div>
-      <h2 style={S.sectionTitle}>FIXTURES BY ROUND</h2>
+    <div style={{width:"100%",display:"block"}}>
+      <h2 style={{...S.sectionTitle,width:"100%"}}>FIXTURES BY ROUND</h2>
       <p style={{fontSize:11,color:"#6b7280",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>All times BST. Use these to decide which team to pick.</p>
       {game.rounds.map(round=>{
         const wcRound=ROUNDS.find(r=>r.id===round.id);
@@ -1138,7 +1138,7 @@ function FixturesTab({ game, matchResults, fixtureOverrides }) {
                   const homeWon=hasScore&&result.h>result.a;
                   const awayWon=hasScore&&result.a>result.h;
                   return (
-                    <div key={i} style={{display:"grid",gridTemplateColumns:"48px 1fr 30px 1fr",alignItems:"center",gap:4,padding:"7px 8px",borderBottom:"1px solid #111318",boxSizing:"border-box",minWidth:0,overflow:"hidden"}}>
+                    <div key={i} style={{display:"grid",gridTemplateColumns:"48px 1fr 30px 1fr",alignItems:"center",gap:4,padding:"7px 8px",borderBottom:"1px solid #111318",boxSizing:"border-box",width:"100%",overflow:"hidden"}}>
                       <span style={{fontSize:9,color:"#666",lineHeight:1.4,flexShrink:0}}><span style={{display:"block"}}>{date}</span><span style={{display:"block"}}>{time.replace(" BST","")}</span></span>
                       <span style={{fontSize:11,color:hasScore?(homeWon?"#a8e031":"#666"):"#ccc",fontWeight:homeWon?700:400,textAlign:"right",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{home} {FLAG[home]||"🏳️"}</span>
                       <span style={{fontSize:hasScore?11:9,color:hasScore?"#fff":"#444",fontFamily:hasScore?"'Bebas Neue',sans-serif":"inherit",textAlign:"center",letterSpacing:0,flexShrink:0}}>
@@ -1829,7 +1829,7 @@ const S = {
   outcomeBtn:{flex:1,padding:"5px 0",background:"transparent",border:"1px solid #1e1f26",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.5,transition:"all 0.1s",fontFamily:"'DM Sans',sans-serif"},
   resultBar:{padding:"9px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26",color:"#a8e031",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontWeight:700},
 
-  fixtureSection:{background:"#13141a",borderRadius:3,marginBottom:10,overflow:"hidden",border:"1px solid #1e1f26",width:"100%",boxSizing:"border-box"},
+  fixtureSection:{background:"#13141a",borderRadius:3,marginBottom:10,overflow:"hidden",width:"100%",boxSizing:"border-box"},
   fixtureSectionHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"13px 16px",cursor:"pointer",gap:8,borderBottom:"1px solid #1e1f26"},
   fixtureSectionTitle:{fontSize:22,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginTop:1},
   deadlineBadge:{background:"transparent",color:"#E61D25",border:"1px solid #E61D25",borderRadius:2,padding:"3px 8px",fontSize:7,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",letterSpacing:1,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
