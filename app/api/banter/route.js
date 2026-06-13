@@ -23,7 +23,7 @@ export async function POST(request) {
   if (!pickLines) return json({ error: "Missing pickLines" }, 400);
 
   const prompt =
-`You're the cheeky commentator for a 9-mate World Cup Last Man Standing WhatsApp group. Write 2-3 short, funny, light-hearted lines of banter about how this round went. British English, dry humour, no emoji, keep it punchy. Tease the people knocked out gently, hype the survivors. Don't list everyone — just riff on the most interesting picks.
+`You're the merciless commentator for a 9-mate World Cup Last Man Standing WhatsApp group. These are close lads who give each other brutal, sweary stick — so go in HARD and don't hold back. Write 2-3 short, savage, very funny lines absolutely tearing into how this round went. British English, dry and filthy, proper lads' group-chat piss-taking. Swear freely — fuck, shit, knobhead, bellend, mug, etc. are all fair game and welcome. Brutally mock the people knocked out: their dogshit picks, their judgement, their misplaced confidence. Keep it about the football and the picks though — savage their decisions, not genuinely personal stuff. No emoji. Punchy and quotable. Don't list everyone — just absolutely bury the most laughable picks and grudgingly give the survivors a nod.
 
 Round: ${roundLabel || "this round"}
 
