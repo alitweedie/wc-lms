@@ -1063,7 +1063,8 @@ Return ONLY the banter lines, nothing else.` }],
 }
 
 function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, setRoundSummary, adminMode, setAdminMode, isFirstRound, isEditing, setEditing, roundIndex }) {
-  const resolved = roundResolved(round);
+  const hasAnyResult = roundResolved(round); // any outcome written — used for entrant tracking
+  const resolved = isRoundFullySettled(round, aliveAtStart); // fully settled — used for display
   const survivors = aliveAtStart.filter(p=>round.outcomes[p]===OUTCOME.WIN);
   const ousted = aliveAtStart.filter(p=>
     round.outcomes[p]===OUTCOME.LOSE||round.outcomes[p]===OUTCOME.DRAW||(resolved&&!round.picks[p]&&roundIndex>0)
@@ -1076,7 +1077,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
     const o = round.outcomes[p];
     return o !== OUTCOME.WIN && o !== OUTCOME.LOSE && o !== OUTCOME.DRAW;
   });
-  const canClose = !resolved && unpickedAlive.length > 0;
+  const canClose = !hasAnyResult && unpickedAlive.length > 0;
 
   const deadlinePassed = wcRound ? isRoundLocked(wcRound) : false;
 
@@ -1207,11 +1208,13 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:28,paddingTop:1}}>
                       {pick?(
                         <>
-                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:1,color:"#fff",lineHeight:1}}>{pick}</span>
-                          <span style={{fontSize:28,lineHeight:1}}>{FLAG[pick]||"🏳️"}</span>
+                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:1,color:"#444",lineHeight:1}}>{pick}</span>
+                          <span style={{fontSize:28,lineHeight:1,opacity:0.3}}>{FLAG[pick]||"🏳️"}</span>
                         </>
                       ):(
-                        <span style={{color:"#333",fontStyle:"italic",fontSize:11}}>no pick</span>
+                        <span style={{fontSize:9,fontWeight:700,color:"#333",letterSpacing:1}}>
+                          {elimMap[player]&&elimMap[player]>0?`OUT R${elimMap[player]}`:"OUT"}
+                        </span>
                       )}
                     </div>
                   )}
