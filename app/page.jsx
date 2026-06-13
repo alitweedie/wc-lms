@@ -1131,7 +1131,7 @@ function FixturesTab({ game, matchResults, fixtureOverrides }) {
               <span style={{...S.expandChevron,flexShrink:0,marginLeft:8}}>{isOpen?"▲":"▼"}</span>
             </div>
             {isOpen&&(
-              <div>
+              <div style={{width:"100%"}}>
                 {fixtures.map(([home,away,date,time],i)=>{
                   const result=matchResults[`${round.id}|${home}|${away}`];
                   const hasScore=result!==undefined;
@@ -1829,7 +1829,7 @@ const S = {
   outcomeBtn:{flex:1,padding:"5px 0",background:"transparent",border:"1px solid #1e1f26",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.5,transition:"all 0.1s",fontFamily:"'DM Sans',sans-serif"},
   resultBar:{padding:"9px 16px",background:"#0b0c10",borderTop:"1px solid #1e1f26",color:"#a8e031",fontSize:9,letterSpacing:3,textTransform:"uppercase",fontWeight:700},
 
-  fixtureSection:{background:"#13141a",borderRadius:3,marginBottom:10,overflow:"hidden",border:"1px solid #1e1f26"},
+  fixtureSection:{background:"#13141a",borderRadius:3,marginBottom:10,overflow:"hidden",border:"1px solid #1e1f26",width:"100%",boxSizing:"border-box"},
   fixtureSectionHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"13px 16px",cursor:"pointer",gap:8,borderBottom:"1px solid #1e1f26"},
   fixtureSectionTitle:{fontSize:22,fontWeight:400,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginTop:1},
   deadlineBadge:{background:"transparent",color:"#E61D25",border:"1px solid #E61D25",borderRadius:2,padding:"3px 8px",fontSize:7,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",letterSpacing:1,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
