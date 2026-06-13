@@ -85,6 +85,21 @@ const ROUNDS = [
   { id:8, stage:"Final" },
 ];
 
+// Map a football-data.org match to our round id.
+// Group stage uses matchday (1/2/3); knockouts use the stage name.
+const STAGE_TO_ROUND = {
+  "ROUND_OF_32":    4,
+  "ROUND_OF_16":    5,
+  "QUARTER_FINALS": 6,
+  "SEMI_FINALS":    7,
+  "FINAL":          8,
+};
+
+function matchRoundId(m) {
+  if (m.stage === "GROUP_STAGE") return m.matchday; // 1, 2, or 3
+  return STAGE_TO_ROUND[m.stage] ?? null;
+}
+
 // ── State helpers ─────────────────────────────────────────────────────────────
 function roundResolved(round) {
   return Object.values(round.outcomes).some(
@@ -220,37 +235,36 @@ async function fetchFinishedMatches(apiKey) {
     duration:  m.score?.duration,
     homeGoals: m.score?.fullTime?.home ?? null,
     awayGoals: m.score?.fullTime?.away ?? null,
+    roundId:   matchRoundId(m),
   }));
 }
 
 function buildResultLookup(matches) {
+  // Key: "roundId|TEAM" -> outcome for that team in that specific round.
+  // Keying by round is essential: a team plays in rounds 1, 2 and 3, so
+  // "USA won" is meaningless without knowing which matchday it refers to.
   const lookup = {};
   for (const m of matches) {
-    if (!m.homeLabel || !m.awayLabel) continue;
-    const flipped =
-      m.winner === "HOME_TEAM" ? "AWAY_TEAM" :
-      m.winner === "AWAY_TEAM" ? "HOME_TEAM" : m.winner;
-    lookup[`${m.homeLabel}|${m.awayLabel}`] = {
-      winner: m.winner, duration: m.duration,
-      homeGoals: m.homeGoals, awayGoals: m.awayGoals,
-    };
-    lookup[`${m.awayLabel}|${m.homeLabel}`] = {
-      winner: flipped, duration: m.duration,
-      homeGoals: m.awayGoals, awayGoals: m.homeGoals,
-    };
+    if (!m.homeLabel || !m.awayLabel || m.roundId == null) continue;
+    const homeOutcome =
+      m.winner === "HOME_TEAM" ? OUTCOME.WIN :
+      m.winner === "AWAY_TEAM" ? OUTCOME.LOSE : OUTCOME.DRAW;
+    const awayOutcome =
+      m.winner === "AWAY_TEAM" ? OUTCOME.WIN :
+      m.winner === "HOME_TEAM" ? OUTCOME.LOSE : OUTCOME.DRAW;
+    lookup[`${m.roundId}|${m.homeLabel}`] = { outcome: homeOutcome, winner: m.winner };
+    lookup[`${m.roundId}|${m.awayLabel}`] = { outcome: awayOutcome, winner: m.winner };
   }
   return lookup;
 }
 
-function resolveOutcome(pick, resultLookup, isKnockout) {
-  for (const [key, result] of Object.entries(resultLookup)) {
-    const [home] = key.split("|");
-    if (home !== pick) continue;
-    const { winner } = result;
-    if (winner === "DRAW") return isKnockout ? null : OUTCOME.DRAW;
-    return winner === "HOME_TEAM" ? OUTCOME.WIN : OUTCOME.LOSE;
-  }
-  return null;
+function resolveOutcome(pick, roundId, resultLookup, isKnockout) {
+  const result = resultLookup[`${roundId}|${pick}`];
+  if (!result) return null; // this team has not played in this round yet
+  // A genuine draw only eliminates in the group stage; knockouts always
+  // produce a winner via ET/pens, so winner is never DRAW there.
+  if (result.outcome === OUTCOME.DRAW && isKnockout) return null;
+  return result.outcome;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -278,13 +292,13 @@ export async function GET(request) {
     log.push(`Fetched ${finished.length} finished match(es) from API`);
     const resultLookup = buildResultLookup(finished);
 
-    // Update matchResults map in state (home|away -> { h, a })
-    // This is read by the fixtures tab to show scores.
+    // Update matchResults map in state. Keyed by "roundId|home|away" so the
+    // fixtures tab shows the correct score against the correct matchday.
     if (!state.matchResults) state.matchResults = {};
     for (const m of finished) {
-      if (!m.homeLabel || !m.awayLabel) continue;
+      if (!m.homeLabel || !m.awayLabel || m.roundId == null) continue;
       if (m.homeGoals === null) continue;
-      const key = `${m.homeLabel}|${m.awayLabel}`;
+      const key = `${m.roundId}|${m.homeLabel}|${m.awayLabel}`;
       state.matchResults[key] = { h: m.homeGoals, a: m.awayGoals };
     }
 
@@ -308,7 +322,7 @@ export async function GET(request) {
           if (!pick) continue;
           if (current === OUTCOME.WIN || current === OUTCOME.LOSE || current === OUTCOME.DRAW) continue;
 
-          const outcome = resolveOutcome(pick, resultLookup, isKnockout);
+          const outcome = resolveOutcome(pick, round.id, resultLookup, isKnockout);
           if (outcome === null) continue;
 
           log.push(`${game.label} R${round.id}: ${player} picked ${pick} -> ${outcome}`);
