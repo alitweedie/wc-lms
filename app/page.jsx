@@ -2086,8 +2086,8 @@ const S = {
   predPlayerBtn:{padding:"5px 12px",borderRadius:2,border:"1px solid",cursor:"pointer",fontSize:9,fontFamily:"'DM Sans',sans-serif",letterSpacing:2,fontWeight:700,textTransform:"uppercase",transition:"all 0.1s"},
 
   // Overview cards
-  overviewCatHeader:{fontSize:9,letterSpacing:3,color:"#666",fontWeight:700,textTransform:"uppercase",marginBottom:8,paddingBottom:6,borderBottom:"1px solid #1a1b22",fontFamily:"'DM Sans',sans-serif"},
-  overviewQLabel:{fontSize:10,color:"#555",marginBottom:1,letterSpacing:0.5,fontFamily:"'DM Sans',sans-serif",paddingBottom:4},
+  overviewCatHeader:{fontSize:9,letterSpacing:3,color:"#E61D25",fontWeight:700,textTransform:"uppercase",marginBottom:8,paddingBottom:6,borderBottom:"1px solid #1e1f26",fontFamily:"'DM Sans',sans-serif"},
+  overviewQLabel:{fontSize:10,color:"#9ca3af",marginBottom:1,letterSpacing:1,fontFamily:"'DM Sans',sans-serif",paddingBottom:4,fontWeight:700,textTransform:"uppercase"},
   overviewPlayerName:{fontSize:8,fontWeight:700,color:"#555",letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
   overviewPickValue:{fontSize:16,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,lineHeight:1.1},
 
