@@ -1145,11 +1145,16 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                 ? (isKnockout ? ALL_NATIONS : realTeams(wcRound))
                 : ALL_NATIONS;
 
+              const playerIdx = state.players.indexOf(player);
+              const isRightCol = playerIdx % 2 === 1;
+              const winBorder = isRightCol ? {borderRight:"3px solid #a8e031",borderLeft:"none"} : {borderLeft:"3px solid #a8e031"};
+              const elimBorder = isRightCol ? {borderRight:"3px solid #E61D25",borderLeft:"none"} : {borderLeft:"3px solid #E61D25"};
+
               let cellStyle = {...S.pickCell};
               if (satOut) cellStyle={...cellStyle,...S.pickCellSatOut};
               else if (!isAlive) cellStyle={...cellStyle,...S.pickCellGhost};
-              else if (outcome===OUTCOME.WIN) cellStyle={...cellStyle,...S.pickCellWin};
-              else if (outcome===OUTCOME.LOSE||outcome===OUTCOME.DRAW) cellStyle={...cellStyle,...S.pickCellElim};
+              else if (outcome===OUTCOME.WIN) cellStyle={...cellStyle,...S.pickCell,...winBorder};
+              else if (outcome===OUTCOME.LOSE||outcome===OUTCOME.DRAW) cellStyle={...cellStyle,...S.pickCell,...elimBorder};
 
               return (
                 <div key={player} style={cellStyle}>
