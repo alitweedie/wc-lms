@@ -2072,7 +2072,7 @@ const S = {
   // Shared "eyebrow" label — small uppercase letter-spaced caption used app-wide
   eyebrow:{fontSize:9,letterSpacing:3,fontWeight:700,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
   predHeader:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:16},
-  predCatHeader:{fontSize:9,letterSpacing:3,color:"#666",padding:"14px 0 8px",borderBottom:"1px solid #1e1f26",marginBottom:10,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
+  predCatHeader:{fontSize:9,letterSpacing:3,color:"#E61D25",padding:"14px 0 8px",borderBottom:"1px solid #1e1f26",marginBottom:10,fontFamily:"'DM Sans',sans-serif",textTransform:"uppercase",fontWeight:700},
   predRow:{background:"#13141a",borderBottom:"1px solid #1a1b22",padding:"12px 0",borderLeft:"3px solid transparent"},
   predPtsBadge:{background:"#E61D25",color:"#fff",borderRadius:2,padding:"2px 7px",fontSize:8,fontWeight:700,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"},
 
