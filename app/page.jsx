@@ -1629,19 +1629,9 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
             const hasAnswer = !!correctAnswer || (q.type==="freetext" && overrideVal !== undefined);
 
             return (
-              <div key={q.id} style={{
-                ...S.predRow,
-                ...(isCorrect?{borderLeft:"3px solid #4caf50",background:"#071a0e"}:
-                  hasAnswer&&playerPick&&!isCorrect?{borderLeft:"3px solid #e53935",background:"#1a0808"}:{}),
-              }}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                    {q.pts>0&&<span style={S.predPtsBadge}>{q.pts}pts</span>}
-                    <span style={{fontSize:12,color:"#e5e7eb",fontWeight:600,fontFamily:"'DM Sans',sans-serif"}}>{q.label}</span>
-                    {isCorrect&&<span style={{color:"#a8e031",fontSize:12}}>✓</span>}
-                    {hasAnswer&&playerPick&&!isCorrect&&<span style={{color:"#e53935",fontSize:12}}>✗</span>}
-                  </div>
-
+              <div key={q.id} style={{marginBottom:12}}>
+                <div style={S.overviewQLabel}>{q.label}</div>
+                <div style={{background:"#13141a",borderLeft:`2px solid ${isCorrect?"#a8e031":hasAnswer&&playerPick&&!isCorrect?"#E61D25":"#1e1f26"}`,padding:"10px 12px",display:"flex",flexDirection:"column",gap:4,borderRadius:2}}>
                   {!adminMode&&!pred.locked&&(
                     q.id==="tiebreak"
                       ? <TiebreakerInput
@@ -1653,11 +1643,15 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                       : <PredictorInput q={q} value={playerPick}
                           onChange={v=>setPredictorPick(selectedPlayer, q.id, v)}/>
                   )}
-                  {!adminMode&&pred.locked&&playerPick&&<PredPickResult
-                    pick={playerPick} qId={q.id} qType={q.type}
-                    answers={pred.answers} overrides={pred.overrides}
-                    player={selectedPlayer}
-                  />}
+                  {!adminMode&&pred.locked&&(
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <span style={{...S.overviewPickValue,fontSize:16}}>
+                        {q.type==="nation"?(FLAG[playerPick]||"🏳️")+" ":""}{playerPick||<span style={{color:"#333",fontSize:11}}>No pick</span>}
+                      </span>
+                      {isCorrect&&<span style={{fontSize:9,fontWeight:700,color:"#a8e031",letterSpacing:1}}>✓ CORRECT</span>}
+                      {hasAnswer&&playerPick&&!isCorrect&&<span style={{fontSize:9,fontWeight:700,color:"#E61D25",letterSpacing:1}}>✗ WRONG</span>}
+                    </div>
+                  )}
                   {adminMode&&(
                     <div style={{marginTop:4}}>
                       {q.type==="freetext" ? (
