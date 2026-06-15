@@ -22,6 +22,9 @@ const NAME_MAP = {
   "Bosnia-Herzegovina":     "Bosnia & Herz.",
   "Côte d'Ivoire":          "Ivory Coast",
   "Cote d'Ivoire":          "Ivory Coast",
+  "Côte D'Ivoire":          "Ivory Coast",
+  "Cote D'Ivoire":          "Ivory Coast",
+  "CÃ´te d'Ivoire":         "Ivory Coast",
   "Congo DR":               "DR Congo",
   "Cape Verde Islands":     "Cape Verde",
   "Cabo Verde":             "Cape Verde",
@@ -34,6 +37,7 @@ function toTrackerLabel(apiName) {
   if (!apiName) return null;
   if (NAME_MAP[apiName]) return NAME_MAP[apiName];
   if (TRACKER_TEAMS.includes(apiName)) return apiName;
+  console.log(`[sync-scores] Unmapped team name from API: "${apiName}"`);
   return null;
 }
 
