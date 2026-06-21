@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 // Load Bebas Neue + DM Sans from Google Fonts
 if (typeof document !== "undefined") {
@@ -1299,7 +1299,29 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
 // FIXTURES TAB
 // ═══════════════════════════════════════════════════════════════════════════════
 function FixturesTab({ game, matchResults, fixtureOverrides }) {
-  const [openRound, setOpenRound] = useState(game.rounds[0]?.id||1);
+  // Default to the current matchday: the first round that isn't fully
+  // finished yet. If every round is complete, default to the last one.
+  const defaultRoundId = useMemo(() => {
+    for (const round of game.rounds) {
+      const wcRound = ROUNDS.find(r=>r.id===round.id);
+      if (!wcRound) continue;
+      const fixtures = fixtureOverrides[round.id] || wcRound.fixtures || [];
+      if (!fixtures.length) continue;
+      const finishedCount = fixtures.filter(([h,a])=>matchResults[`${round.id}|${h}|${a}`]!==undefined).length;
+      const allDone = finishedCount === fixtures.length;
+      if (!allDone) return round.id; // first not-yet-fully-finished round
+    }
+    return game.rounds[game.rounds.length-1]?.id || game.rounds[0]?.id || 1; // everything done — show last
+  }, [game.rounds, matchResults, fixtureOverrides]);
+
+  const [openRound, setOpenRound] = useState(defaultRoundId);
+  const didInitialSync = useRef(false);
+  useEffect(() => {
+    if (!didInitialSync.current && Object.keys(matchResults||{}).length > 0) {
+      setOpenRound(defaultRoundId);
+      didInitialSync.current = true;
+    }
+  }, [defaultRoundId, matchResults]);
   return (
     <div style={{width:"100%",display:"block"}}>
       <h2 style={{...S.sectionTitle,width:"100%"}}>FIXTURES BY ROUND</h2>
