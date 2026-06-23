@@ -263,11 +263,16 @@ async function saveData(d) {
   } catch(e) { console.error(e); }
 }
 
-function buildGame(id, startRoundIdx=0) {
+function buildGame(id, startRoundIdx=0, opts={}) {
   return {
-    id, label:`Game ${id}`, startRoundIdx,
+    id, label: opts.label || `Game ${id}`, startRoundIdx,
     rounds: ROUNDS.slice(startRoundIdx).map(r=>({ id:r.id, label:r.label, stage:r.stage, picks:{}, outcomes:{}, tiebreaker:{} })),
     complete:false, winners:[], rollover:0,
+    // parallel games run alongside the main sequence rather than after it.
+    // restrictedTo, when set, limits entrants to a fixed list of players
+    // (used for "second chance" games for people already eliminated elsewhere).
+    parallel: opts.parallel || false,
+    restrictedTo: opts.restrictedTo || null,
   };
 }
 
@@ -290,10 +295,11 @@ function roundResolved(round) {
 }
 
 function gameEntrants(game, players) {
+  const eligible = game.restrictedTo ? players.filter(p=>game.restrictedTo.includes(p)) : players;
   const r0 = game.rounds[0];
-  if (!r0) return players;
-  if (!roundResolved(r0)) return players;
-  return players.filter(p => !!r0.picks[p]);
+  if (!r0) return eligible;
+  if (!roundResolved(r0)) return eligible;
+  return eligible.filter(p => !!r0.picks[p]);
 }
 
 function calcPot(game, players) {
@@ -355,7 +361,7 @@ function isRoundFullySettled(round, aliveAtStart) {
   });
 }
 
-function evaluateGameEnd(g, players) {
+function evaluateGameEnd(g, players, allGames, thisGi) {
   let lastSettledIdx = -1;
   for (let i = 0; i < g.rounds.length; i++) {
     const alive = getAliveAtStart(g, players, i);
@@ -397,6 +403,16 @@ function evaluateGameEnd(g, players) {
   // so no new game should ever spawn after it.
   const wcIdx = ROUNDS.findIndex(wr => wr.id === lastRound.id);
   if (wcIdx >= ROUNDS.length - 1) return;
+
+  // Parallel ("second chance") games never auto-spawn a sequential follow-on —
+  // only the main sequence does that. And even then, only once EVERY other
+  // currently-running game (main or parallel) has also finished, so a second
+  // chance game in progress holds back the next main game until it's done.
+  if (g.parallel) return;
+  if (allGames && Array.isArray(allGames)) {
+    const othersStillRunning = allGames.some((og, i) => i !== thisGi && !og.complete);
+    if (othersStillRunning) return;
+  }
 
   const pot = calcPot(g, players);
   const newGame = buildGame(0, wcIdx + 1);
@@ -563,6 +579,29 @@ export default function App() {
     if (r) { r.summary = summary; r.summaryAt = Date.now(); }
   });
 
+  const startSecondChanceGame = (sourceGi) => update(s => {
+    const sourceGame = s.games[sourceGi];
+    if (!sourceGame) return;
+
+    // Start from the next round the main tournament hasn't locked yet —
+    // i.e. one past whatever round is currently furthest along across all games.
+    let furthestRoundIdx = -1;
+    for (const g of s.games) {
+      const idx = g.rounds.reduce((acc,r,i)=> (roundResolved(r)?i:acc), -1);
+      const wcIdx = g.rounds[0] ? ROUNDS.findIndex(wr=>wr.id===g.rounds[0].id) + idx : -1;
+      if (wcIdx > furthestRoundIdx) furthestRoundIdx = wcIdx;
+    }
+    const startRoundIdx = Math.max(0, furthestRoundIdx + 1);
+    if (startRoundIdx >= ROUNDS.length) return; // tournament already over
+
+    const newId = s.games.length + 1;
+    const newGame = buildGame(newId, startRoundIdx, {
+      parallel: true,
+      label: `Game ${newId}`,
+    });
+    s.games.push(newGame);
+  });
+
   const closeRound = (gi, roundId) => update(s => {
     const g = s.games[gi];
     const r = g.rounds.find(r => r.id === roundId);
@@ -575,7 +614,7 @@ export default function App() {
         r.outcomes[p] = OUTCOME.LOSE;
       }
     }
-    const newGame = evaluateGameEnd(g, s.players);
+    const newGame = evaluateGameEnd(g, s.players, s.games, gi);
     if (newGame) {
       const alreadyExists = s.games.length > gi + 1;
       if (!alreadyExists) {
@@ -624,7 +663,7 @@ export default function App() {
       }
     }
 
-    const newGame = evaluateGameEnd(g, s.players);
+    const newGame = evaluateGameEnd(g, s.players, s.games, gi);
     if (newGame) {
       const alreadyExists = s.games.length > gi + 1;
       if (!alreadyExists) {
@@ -753,7 +792,7 @@ export default function App() {
             {state.games.map((g,i)=>(
               <button key={g.id} onClick={()=>setActiveGameIdx(i)}
                 style={{...S.gameTab,...(i===activeGameIdx?S.gameTabActive:{})}}>
-                {g.label}{g.complete?" ✓":""}
+                {g.parallel?"⚡ ":""}{g.label}{g.complete?" ✓":""}
               </button>
             ))}
           </div>
@@ -802,6 +841,7 @@ export default function App() {
             closeRound={closeRound} reopenRound={reopenRound} setTiebreaker={setTiebreaker}
             setRoundSummary={setRoundSummary}
             adminMode={adminMode} setAdminMode={setAdminMode}
+            startSecondChanceGame={startSecondChanceGame}
             editingRound={editingRound} setEditingRound={setEditingRound}/>
         )}
         {tab==="fixtures"&&<FixturesTab game={game} matchResults={state.matchResults||{}} fixtureOverrides={state.fixtureOverrides||{}}/>}
@@ -861,9 +901,38 @@ function PinModal({ onSuccess, onCancel }) {
   );
 }
 
-function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, setRoundSummary, adminMode, setAdminMode, editingRound, setEditingRound }) {
+function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, setRoundSummary, adminMode, setAdminMode, startSecondChanceGame, editingRound, setEditingRound }) {
+  const hasParallelAlready = state.games.some(g=>g.parallel && !g.complete);
+  const canStartSecondChance = adminMode && !game.parallel && !hasParallelAlready;
+  const [confirmingSC, setConfirmingSC] = useState(false);
+
   return (
     <div>
+      {canStartSecondChance && (
+        <div style={{marginBottom:12}}>
+          {!confirmingSC ? (
+            <button onClick={()=>setConfirmingSC(true)}
+              style={{width:"100%",background:"#1a1b22",border:"1px solid #2a2c36",color:"#a8e031",borderRadius:3,padding:"11px 0",fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
+              ⚡ Start second game
+            </button>
+          ) : (
+            <div style={{background:"#13141a",border:"1px solid #2a2c36",borderRadius:3,padding:14}}>
+              <p style={{margin:"0 0 10px",fontSize:12,color:"#ddd",fontFamily:"'DM Sans',sans-serif",lineHeight:1.5}}>
+                Start a second game open to everyone — including people still alive in this one. It runs alongside this game, with its own pot. The next sequential game won't start until both finish.
+              </p>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setConfirmingSC(false)} style={{flex:1,padding:"8px 0",background:"transparent",border:"1px solid #2a2c36",borderRadius:3,color:"#9ca3af",fontSize:11,fontWeight:700,letterSpacing:1,fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>CANCEL</button>
+                <button onClick={()=>{ startSecondChanceGame(gi); setConfirmingSC(false); }} style={{flex:1,padding:"8px 0",background:"#E61D25",border:"none",borderRadius:3,color:"#fff",fontSize:11,fontWeight:700,letterSpacing:1,fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>START IT</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {game.parallel && (
+        <div style={{background:"#1a1b22",border:"1px solid #a8e031",borderRadius:3,padding:"10px 14px",marginBottom:12,fontSize:11,color:"#a8e031",fontFamily:"'DM Sans',sans-serif",letterSpacing:0.5}}>
+          ⚡ Second game — open to everyone, running alongside another game.
+        </div>
+      )}
       {rounds.map((round) => {
         const wcRound = ROUNDS.find(r=>r.id===round.id);
         const realRoundIdx = game.rounds.indexOf(round);
