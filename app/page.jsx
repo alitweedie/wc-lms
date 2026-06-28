@@ -214,7 +214,10 @@ function isRoundLocked(wcRound) {
   if (!lockTime) return false;
   return Date.now() > lockTime.getTime();
 }
-const realTeams = r => [...new Set(r.fixtures.flatMap(([h,a])=>[h,a]).filter(t=>!isPlaceholder(t)))].sort();
+const realTeams = (r, overrideFixtures) => {
+  const fixtures = (overrideFixtures && overrideFixtures.length) ? overrideFixtures : r.fixtures;
+  return [...new Set(fixtures.flatMap(([h,a])=>[h,a]).filter(t=>!isPlaceholder(t)))].sort();
+};
 
 const OUTCOME = { WIN:"win", LOSE:"lose", DRAW:"draw", PENDING:"" };
 const POLL_MS = 5000;
@@ -1225,8 +1228,14 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
               const outcome = round.outcomes[player];
               const used = usedTeams(game, player, roundIndex);
               const isKnockout = wcRound && wcRound.id >= 4;
+              const overrideFixtures = state.fixtureOverrides && state.fixtureOverrides[round.id];
+              const knownTeams = wcRound ? realTeams(wcRound, overrideFixtures) : [];
+              // For knockout rounds, only show teams confirmed to be playing in
+              // this round (from the real fixture list, synced or hardcoded).
+              // If no real teams are known yet (still "TBD"/"Winner" placeholders),
+              // fall back to every nation so the round can still technically be used.
               const availTeams = wcRound
-                ? (isKnockout ? ALL_NATIONS : realTeams(wcRound))
+                ? (isKnockout ? (knownTeams.length ? knownTeams : ALL_NATIONS) : knownTeams)
                 : ALL_NATIONS;
 
               const playerIdx = state.players.indexOf(player);
@@ -1262,7 +1271,7 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                         <select style={S.pickSelect} value={pick||""}
                           onChange={e=>setPick(gi,round.id,player,e.target.value)}>
                           <option value="">{isFirstRound?"— select team to enter —":"— select team —"}</option>
-                          {availTeams.map(t=>{
+                          {(pick&&!availTeams.includes(pick)?[pick,...availTeams]:availTeams).map(t=>{
                             const wasUsed=used.has(t);
                             return <option key={t} value={t} disabled={wasUsed}>{FLAG[t]||"🏳️"} {t}{wasUsed?" ✗":""}</option>;
                           })}
@@ -1389,7 +1398,8 @@ function FixturesTab({ game, matchResults, fixtureOverrides }) {
     for (const round of game.rounds) {
       const wcRound = ROUNDS.find(r=>r.id===round.id);
       if (!wcRound) continue;
-      const fixtures = fixtureOverrides[round.id] || wcRound.fixtures || [];
+      const ov = fixtureOverrides[round.id];
+      const fixtures = (ov && ov.length) ? ov : (wcRound.fixtures || []);
       if (!fixtures.length) continue;
       const finishedCount = fixtures.filter(([h,a])=>matchResults[`${round.id}|${h}|${a}`]!==undefined).length;
       const allDone = finishedCount === fixtures.length;
@@ -1415,7 +1425,8 @@ function FixturesTab({ game, matchResults, fixtureOverrides }) {
         if (!wcRound) return null;
         const isOpen=openRound===round.id;
         // Use API-synced fixtures if available, otherwise fall back to hardcoded
-        const fixtures = fixtureOverrides[round.id] || wcRound.fixtures || [];
+        const ov = fixtureOverrides[round.id];
+        const fixtures = (ov && ov.length) ? ov : (wcRound.fixtures || []);
         const finishedCount=fixtures.filter(([h,a])=>matchResults[`${round.id}|${h}|${a}`]!==undefined).length;
         const totalCount=fixtures.length;
         const allDone=finishedCount===totalCount&&totalCount>0;
