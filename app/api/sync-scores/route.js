@@ -92,11 +92,17 @@ const ROUNDS = [
 // Map a football-data.org match to our round id.
 // Group stage uses matchday (1/2/3); knockouts use the stage name.
 const STAGE_TO_ROUND = {
-  "ROUND_OF_32":    4,
-  "ROUND_OF_16":    5,
+  // football-data.org's actual stage strings for the 48-team format:
+  "LAST_32":        4,
+  "LAST_16":        5,
   "QUARTER_FINALS": 6,
   "SEMI_FINALS":    7,
   "FINAL":          8,
+  // Defensive aliases in case the API ever switches naming mid-tournament:
+  "ROUND_OF_32":    4,
+  "ROUND_OF_16":    5,
+  "QUARTER_FINAL":  6,
+  "SEMI_FINAL":     7,
 };
 
 function matchRoundId(m) {
