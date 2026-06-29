@@ -1267,7 +1267,8 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                     <div style={{paddingTop:2,color:"#2a2a2a",fontSize:11,fontStyle:"italic",letterSpacing:0.5}}>—</div>
                   ):isAlive?(
                     <>
-                      {!resolved&&!deadlinePassed?(
+                      {!resolved&&(!deadlinePassed||adminMode)?(
+                        <>
                         <select style={S.pickSelect} value={pick||""}
                           onChange={e=>setPick(gi,round.id,player,e.target.value)}>
                           <option value="">{isFirstRound?"— select team to enter —":"— select team —"}</option>
@@ -1276,6 +1277,10 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
                             return <option key={t} value={t} disabled={wasUsed}>{FLAG[t]||"🏳️"} {t}{wasUsed?" ✗":""}</option>;
                           })}
                         </select>
+                        {deadlinePassed&&adminMode&&(
+                          <span style={{display:"block",marginTop:3,color:"#E61D25",fontSize:8,fontWeight:700,letterSpacing:1}}>⚠ LATE PICK · LOCK BYPASSED</span>
+                        )}
+                        </>
                       ):(
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:28,paddingTop:1}}>
                           {pick?(
