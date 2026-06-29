@@ -104,6 +104,20 @@ function matchRoundId(m) {
   return STAGE_TO_ROUND[m.stage] ?? null;
 }
 
+// Collect the stage strings the API actually sends for any non-group match,
+// so we can surface them in the response log for diagnosis.
+function unmappedStages(rawMatches) {
+  const seen = {};
+  for (const m of rawMatches) {
+    if (m.stage === "GROUP_STAGE") continue;
+    if (STAGE_TO_ROUND[m.stage] == null) {
+      const k = m.stage || "(no stage)";
+      seen[k] = (seen[k] || 0) + 1;
+    }
+  }
+  return seen;
+}
+
 // ── State helpers ─────────────────────────────────────────────────────────────
 function roundResolved(round) {
   return Object.values(round.outcomes).some(
@@ -232,7 +246,8 @@ async function fetchFinishedMatches(apiKey) {
   );
   if (!res.ok) throw new Error(`football-data.org returned ${res.status}`);
   const data = await res.json();
-  return (data.matches ?? []).map(m => ({
+  const raw = data.matches ?? [];
+  const mapped = raw.map(m => ({
     homeLabel: toTrackerLabel(m.homeTeam?.name),
     awayLabel: toTrackerLabel(m.awayTeam?.name),
     winner:    m.score?.winner,
@@ -241,6 +256,7 @@ async function fetchFinishedMatches(apiKey) {
     awayGoals: m.score?.fullTime?.away ?? null,
     roundId:   matchRoundId(m),
   }));
+  return { raw, mapped };
 }
 
 function buildResultLookup(matches) {
@@ -292,8 +308,20 @@ export async function GET(request) {
     if (!state) return respond({ error: "No state in Redis" }, 500);
     log.push("State loaded successfully");
 
-    const finished     = await fetchFinishedMatches(apiKey);
+    const { raw, mapped: finished } = await fetchFinishedMatches(apiKey);
     log.push(`Fetched ${finished.length} finished match(es) from API`);
+
+    // Diagnostic: surface any non-group stage strings the API uses that we
+    // don't map, plus a peek at non-group matches and how they resolved.
+    const unmapped = unmappedStages(raw);
+    if (Object.keys(unmapped).length) {
+      log.push(`Unmapped stage strings: ${JSON.stringify(unmapped)}`);
+    }
+    for (const m of raw) {
+      if (m.stage === "GROUP_STAGE") continue;
+      log.push(`Non-group match: stage="${m.stage}" md=${m.matchday} ${m.homeTeam?.name} v ${m.awayTeam?.name} -> roundId=${matchRoundId(m)}`);
+    }
+
     const resultLookup = buildResultLookup(finished);
 
     // Update matchResults map in state. Keyed by "roundId|home|away" so the
