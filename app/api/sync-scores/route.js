@@ -297,6 +297,7 @@ function resolveOutcome(pick, roundId, resultLookup, isKnockout) {
 export async function GET(request) {
   const url        = new URL(request.url);
   const isDry      = url.searchParams.get("dry") === "1";
+  const DIAG       = isDry || url.searchParams.get("diag") === "1";
   const apiKey     = process.env.FOOTBALL_DATA_API_KEY;
   const cronSecret = process.env.CRON_SECRET;
   const log        = [];
@@ -353,6 +354,12 @@ export async function GET(request) {
         const isKnockout   = round.id >= 4;
         const aliveAtStart = getAliveAtStart(game, state.players, rIdx);
 
+        // Diagnostic for knockout rounds: surface why outcomes may not apply.
+        if (isKnockout && DIAG) {
+          const lookupKeys = Object.keys(resultLookup).filter(k => k.startsWith(`${round.id}|`));
+          log.push(`DIAG ${game.label} R${round.id}: aliveAtStart=[${aliveAtStart.join(",")}] | lookupKeys=[${lookupKeys.join(", ")}]`);
+        }
+
         for (const player of aliveAtStart) {
           const pick    = round.picks[player];
           const current = round.outcomes[player];
@@ -361,6 +368,9 @@ export async function GET(request) {
           if (current === OUTCOME.WIN || current === OUTCOME.LOSE || current === OUTCOME.DRAW) continue;
 
           const outcome = resolveOutcome(pick, round.id, resultLookup, isKnockout);
+          if (isKnockout && DIAG) {
+            log.push(`DIAG   ${player} pick="${pick}" lookup["${round.id}|${pick}"]=${JSON.stringify(resultLookup[`${round.id}|${pick}`]||null)} -> ${outcome}`);
+          }
           if (outcome === null) continue;
 
           log.push(`${game.label} R${round.id}: ${player} picked ${pick} -> ${outcome}`);
