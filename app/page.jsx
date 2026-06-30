@@ -920,8 +920,21 @@ function PinModal({ onSuccess, onCancel }) {
 }
 
 function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOutcome, closeRound, reopenRound, setTiebreaker, setRoundSummary, adminMode, setAdminMode, startSecondChanceGame, editingRound, setEditingRound }) {
-  const hasParallelAlready = state.games.some(g=>g.parallel && !g.complete);
-  const canStartSecondChance = adminMode && !game.parallel && !hasParallelAlready;
+  // Admins can start a new concurrent game at any time, even while other
+  // parallel games are running — e.g. people knocked out of games 1 and 2
+  // want a fresh game from the next round. Only blocked once the tournament
+  // has no more startable rounds left.
+  const nextStartableExists = (() => {
+    let furthest = -1;
+    for (const g of state.games) {
+      const idx = g.rounds.reduce((acc,r,i)=> (roundResolved(r)?i:acc), -1);
+      const wcIdx = g.rounds[0] ? ROUNDS.findIndex(wr=>wr.id===g.rounds[0].id) + idx : -1;
+      if (wcIdx > furthest) furthest = wcIdx;
+    }
+    return (furthest + 1) < ROUNDS.length;
+  })();
+  const newGameNumber = state.games.length + 1;
+  const canStartSecondChance = adminMode && nextStartableExists;
   const [confirmingSC, setConfirmingSC] = useState(false);
 
   return (
@@ -931,12 +944,12 @@ function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOu
           {!confirmingSC ? (
             <button onClick={()=>setConfirmingSC(true)}
               style={{width:"100%",background:"#1a1b22",border:"1px solid #2a2c36",color:"#a8e031",borderRadius:3,padding:"11px 0",fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
-              ⚡ Start second game
+              ⚡ Start game {newGameNumber}
             </button>
           ) : (
             <div style={{background:"#13141a",border:"1px solid #2a2c36",borderRadius:3,padding:14}}>
               <p style={{margin:"0 0 10px",fontSize:12,color:"#ddd",fontFamily:"'DM Sans',sans-serif",lineHeight:1.5}}>
-                Start a second game open to everyone — including people still alive in this one. It runs alongside this game, with its own pot. The next sequential game won't start until both finish.
+                Start <strong style={{color:"#a8e031"}}>Game {newGameNumber}</strong> from the next round, open to everyone — including people still alive in other games. It runs alongside any games already in progress, with its own £2-per-entry pot. The next sequential game won't auto-start until all running games finish.
               </p>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>setConfirmingSC(false)} style={{flex:1,padding:"8px 0",background:"transparent",border:"1px solid #2a2c36",borderRadius:3,color:"#9ca3af",fontSize:11,fontWeight:700,letterSpacing:1,fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>CANCEL</button>
@@ -948,7 +961,7 @@ function TrackerTab({ rounds, game, gi, state, elimMap, entrants, setPick, setOu
       )}
       {game.parallel && (
         <div style={{background:"#1a1b22",border:"1px solid #a8e031",borderRadius:3,padding:"10px 14px",marginBottom:12,fontSize:11,color:"#a8e031",fontFamily:"'DM Sans',sans-serif",letterSpacing:0.5}}>
-          ⚡ Second game — open to everyone, running alongside another game.
+          ⚡ Concurrent game — open to everyone, running alongside other games.
         </div>
       )}
       {rounds.map((round) => {
