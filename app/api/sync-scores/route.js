@@ -260,9 +260,34 @@ async function fetchFinishedMatches(apiKey) {
     duration:  m.score?.duration,
     homeGoals: m.score?.fullTime?.home ?? null,
     awayGoals: m.score?.fullTime?.away ?? null,
+    penHome:   m.score?.penalties?.home ?? null,
+    penAway:   m.score?.penalties?.away ?? null,
     roundId:   matchRoundId(m),
   }));
   return { raw, mapped };
+}
+
+// Determine the winner side ("HOME_TEAM" | "AWAY_TEAM" | "DRAW") robustly.
+// football-data.org sometimes returns score.winner = null for matches that
+// went to extra time or penalties, while still providing the goal counts.
+// fullTime goals in v4 include extra-time goals; if those are level the match
+// was decided on penalties, so we fall back to the penalty shoot-out score.
+function deriveWinner(m) {
+  if (m.winner === "HOME_TEAM" || m.winner === "AWAY_TEAM" || m.winner === "DRAW") {
+    return m.winner;
+  }
+  const h = m.homeGoals, a = m.awayGoals;
+  if (h != null && a != null) {
+    if (h > a) return "HOME_TEAM";
+    if (a > h) return "AWAY_TEAM";
+    // Level after full/extra time — decided on penalties if we have them.
+    if (m.penHome != null && m.penAway != null) {
+      if (m.penHome > m.penAway) return "HOME_TEAM";
+      if (m.penAway > m.penHome) return "AWAY_TEAM";
+    }
+    return "DRAW"; // genuinely level with no shoot-out data
+  }
+  return null; // not enough info
 }
 
 function buildResultLookup(matches) {
@@ -272,14 +297,15 @@ function buildResultLookup(matches) {
   const lookup = {};
   for (const m of matches) {
     if (!m.homeLabel || !m.awayLabel || m.roundId == null) continue;
+    const winner = deriveWinner(m);
     const homeOutcome =
-      m.winner === "HOME_TEAM" ? OUTCOME.WIN :
-      m.winner === "AWAY_TEAM" ? OUTCOME.LOSE : OUTCOME.DRAW;
+      winner === "HOME_TEAM" ? OUTCOME.WIN :
+      winner === "AWAY_TEAM" ? OUTCOME.LOSE : OUTCOME.DRAW;
     const awayOutcome =
-      m.winner === "AWAY_TEAM" ? OUTCOME.WIN :
-      m.winner === "HOME_TEAM" ? OUTCOME.LOSE : OUTCOME.DRAW;
-    lookup[`${m.roundId}|${m.homeLabel}`] = { outcome: homeOutcome, winner: m.winner };
-    lookup[`${m.roundId}|${m.awayLabel}`] = { outcome: awayOutcome, winner: m.winner };
+      winner === "AWAY_TEAM" ? OUTCOME.WIN :
+      winner === "HOME_TEAM" ? OUTCOME.LOSE : OUTCOME.DRAW;
+    lookup[`${m.roundId}|${m.homeLabel}`] = { outcome: homeOutcome, winner };
+    lookup[`${m.roundId}|${m.awayLabel}`] = { outcome: awayOutcome, winner };
   }
   return lookup;
 }
@@ -326,7 +352,8 @@ export async function GET(request) {
     }
     for (const m of raw) {
       if (m.stage === "GROUP_STAGE") continue;
-      log.push(`Non-group match: stage="${m.stage}" md=${m.matchday} ${m.homeTeam?.name} v ${m.awayTeam?.name} -> roundId=${matchRoundId(m)}`);
+      const sc = m.score || {};
+      log.push(`Non-group match: stage="${m.stage}" ${m.homeTeam?.name} v ${m.awayTeam?.name} -> roundId=${matchRoundId(m)} | winner=${sc.winner} dur=${sc.duration} ft=${sc.fullTime?.home}-${sc.fullTime?.away} pens=${sc.penalties?.home}-${sc.penalties?.away}`);
     }
 
     const resultLookup = buildResultLookup(finished);
