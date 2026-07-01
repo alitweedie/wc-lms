@@ -215,9 +215,36 @@ function isRoundLocked(wcRound) {
   return Date.now() > lockTime.getTime();
 }
 const realTeams = (r, overrideFixtures) => {
-  const fixtures = (overrideFixtures && overrideFixtures.length) ? overrideFixtures : r.fixtures;
+  const fixtures = resolveFixtures(r, overrideFixtures);
   return [...new Set(fixtures.flatMap(([h,a])=>[h,a]).filter(t=>!isPlaceholder(t)))].sort();
 };
+
+// Merge a (possibly partial) synced override into the full static fixture list.
+// The sync can only resolve a knockout slot once BOTH feeder teams are known,
+// so overrides often contain fewer rows than the round actually has. We must
+// still show every slot: for each static fixture we look for a synced fixture
+// at the same kickoff (date+time) and, if its team names are real (not
+// placeholders), use them; otherwise we keep the static row as-is. This keeps
+// all rows visible and fills in real teams as they resolve.
+function resolveFixtures(wcRound, override) {
+  const staticFx = wcRound?.fixtures || [];
+  if (!override || !override.length) return staticFx;
+  // If the override is at least as complete as the static list and every row
+  // has real team names, just use it directly (covers fully-synced rounds).
+  const overrideAllReal = override.length >= staticFx.length &&
+    override.every(([h,a]) => !isPlaceholder(h) && !isPlaceholder(a));
+  if (overrideAllReal) return override;
+  // Otherwise merge by kickoff time.
+  const norm = t => (t||"").replace(/\s*BST$/i,"").trim();
+  return staticFx.map(sf => {
+    const [, , sDate, sTime] = sf;
+    const match = override.find(([h,a,d,t]) =>
+      norm(d)===norm(sDate) && norm(t)===norm(sTime) &&
+      !isPlaceholder(h) && !isPlaceholder(a)
+    );
+    return match || sf;
+  });
+}
 
 const OUTCOME = { WIN:"win", LOSE:"lose", DRAW:"draw", PENDING:"" };
 const POLL_MS = 5000;
@@ -1413,10 +1440,7 @@ function FixturesTab({ matchResults, fixtureOverrides }) {
   // Fixtures are the same real-world matches regardless of which LMS game you're
   // viewing, so this page always shows the full tournament (all ROUNDS) and is
   // identical across game tabs.
-  const roundsFor = (r) => {
-    const ov = fixtureOverrides[r.id];
-    return (ov && ov.length) ? ov : (r.fixtures || []);
-  };
+  const roundsFor = (r) => resolveFixtures(r, fixtureOverrides[r.id]);
   // Default to the current round: the first round that isn't fully finished yet.
   const defaultRoundId = useMemo(() => {
     let firstUnfinished = null;
@@ -1447,9 +1471,8 @@ function FixturesTab({ matchResults, fixtureOverrides }) {
       {ROUNDS.map(wcRound=>{
         const round=wcRound; // iterate the full tournament, not a specific game
         const isOpen=openRound===round.id;
-        // Use API-synced fixtures if available, otherwise fall back to hardcoded
-        const ov = fixtureOverrides[round.id];
-        const fixtures = (ov && ov.length) ? ov : (wcRound.fixtures || []);
+        // Merge synced real teams into the full fixture list (keeps all rows)
+        const fixtures = resolveFixtures(wcRound, fixtureOverrides[round.id]);
         const finishedCount=fixtures.filter(([h,a])=>matchResults[`${round.id}|${h}|${a}`]!==undefined).length;
         const totalCount=fixtures.length;
         const allDone=finishedCount===totalCount&&totalCount>0;
