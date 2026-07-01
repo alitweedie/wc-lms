@@ -862,7 +862,7 @@ export default function App() {
             startSecondChanceGame={startSecondChanceGame}
             editingRound={editingRound} setEditingRound={setEditingRound}/>
         )}
-        {tab==="fixtures"&&<FixturesTab key={game.id} game={game} matchResults={state.matchResults||{}} fixtureOverrides={state.fixtureOverrides||{}}/>}
+        {tab==="fixtures"&&<FixturesTab matchResults={state.matchResults||{}} fixtureOverrides={state.fixtureOverrides||{}}/>}
         {tab==="money"&&<MoneyTab state={state}/>}
         {tab==="predictor"&&(
           <PredictorTab
@@ -1409,27 +1409,28 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
 // ═══════════════════════════════════════════════════════════════════════════════
 // FIXTURES TAB
 // ═══════════════════════════════════════════════════════════════════════════════
-function FixturesTab({ game, matchResults, fixtureOverrides }) {
-  // Default to the current matchday: the first round that isn't fully
-  // finished yet. If every round is complete, default to the last one.
+function FixturesTab({ matchResults, fixtureOverrides }) {
+  // Fixtures are the same real-world matches regardless of which LMS game you're
+  // viewing, so this page always shows the full tournament (all ROUNDS) and is
+  // identical across game tabs.
+  const roundsFor = (r) => {
+    const ov = fixtureOverrides[r.id];
+    return (ov && ov.length) ? ov : (r.fixtures || []);
+  };
+  // Default to the current round: the first round that isn't fully finished yet.
   const defaultRoundId = useMemo(() => {
     let firstUnfinished = null;
     let lastWithFixtures = null;
-    for (const round of game.rounds) {
-      const wcRound = ROUNDS.find(r=>r.id===round.id);
-      if (!wcRound) continue;
-      const ov = fixtureOverrides[round.id];
-      const fixtures = (ov && ov.length) ? ov : (wcRound.fixtures || []);
+    for (const r of ROUNDS) {
+      const fixtures = roundsFor(r);
       if (!fixtures.length) continue;
-      lastWithFixtures = round.id;
-      const finishedCount = fixtures.filter(([h,a])=>matchResults[`${round.id}|${h}|${a}`]!==undefined).length;
-      const allDone = finishedCount === fixtures.length; // fixtures.length > 0 here
-      // Prefer the first round that has started but isn't finished (a live round);
-      // otherwise the first round that hasn't started at all.
-      if (!allDone && firstUnfinished === null) firstUnfinished = round.id;
+      lastWithFixtures = r.id;
+      const finishedCount = fixtures.filter(([h,a])=>matchResults[`${r.id}|${h}|${a}`]!==undefined).length;
+      const allDone = finishedCount === fixtures.length;
+      if (!allDone && firstUnfinished === null) firstUnfinished = r.id;
     }
-    return firstUnfinished ?? lastWithFixtures ?? game.rounds[0]?.id ?? 1;
-  }, [game.rounds, matchResults, fixtureOverrides]);
+    return firstUnfinished ?? lastWithFixtures ?? ROUNDS[0]?.id ?? 1;
+  }, [matchResults, fixtureOverrides]);
 
   const [openRound, setOpenRound] = useState(defaultRoundId);
   const userTapped = useRef(false);
@@ -1443,9 +1444,8 @@ function FixturesTab({ game, matchResults, fixtureOverrides }) {
     <div style={{width:"100%",display:"block"}}>
       <h2 style={{...S.sectionTitle,width:"100%"}}>FIXTURES BY ROUND</h2>
       <p style={{fontSize:11,color:"#6b7280",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>All times BST. Use these to decide which team to pick.</p>
-      {game.rounds.map(round=>{
-        const wcRound=ROUNDS.find(r=>r.id===round.id);
-        if (!wcRound) return null;
+      {ROUNDS.map(wcRound=>{
+        const round=wcRound; // iterate the full tournament, not a specific game
         const isOpen=openRound===round.id;
         // Use API-synced fixtures if available, otherwise fall back to hardcoded
         const ov = fixtureOverrides[round.id];
