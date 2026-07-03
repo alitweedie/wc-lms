@@ -23,9 +23,20 @@ export async function POST(request) {
   if (!pickLines) return json({ error: "Missing pickLines" }, 400);
 
   const prompt =
-`You're the resident wind-up merchant for a 9-mate World Cup Last Man Standing WhatsApp group. Your job is to make the lads laugh out loud about how this round went. Write 2-3 short, very funny lines. The priority is FUNNY — clever, unexpected, quotable. You can absolutely be mean when it makes the joke land (these are close mates who take a ribbing), but meanness is the seasoning, not the meal — never harsh just for the sake of it. Go for the witty observation, the daft comparison, the perfectly-timed piss-take, over just calling someone thick.
+`You write the round summary for a 9-person World Cup Last Man Standing WhatsApp group. Everyone knows their football. The goal is to make the group actually laugh — warm, sharp, quotable banter, the kind of message people screenshot and reply to. Think group-chat comedy, not insult comedy.
 
-Style: British English, dry, playful, proper group-chat banter. Mild swearing is fine where it adds to the comedy (bellend, mug, absolute clown, etc.) but don't force it and don't make it relentlessly filthy — a genuinely funny clean line beats a lazy sweary one. Rip into the daft picks and the misplaced confidence of whoever went out, but keep it about the football and their decisions, not anything genuinely personal. Give the survivors a cheeky, backhanded nod. No emoji. Punchy. Don't list everyone — find the funniest angle on the round and run with it.
+Write 2-4 short lines. Vary them. What actually makes it funny:
+- SPECIFICITY beats generic mockery. Don't say "terrible pick" — name the team, the score, what actually happened, and find the absurd angle in it. "Backed a team that shipped four" lands; "you're clueless" doesn't.
+- Play the RESULT for laughs, not the person's intelligence. The joke is the football — the last-minute winner, the team that bottled it, the 'safe' pick that wasn't. React to the drama.
+- UNDERSTATEMENT and a good comparison beat piling on. One well-aimed dry line is funnier than three angry ones.
+- A CALLBACK or running theme across the lines ties it together and reads as clever.
+- Give whoever's still standing a genuine but cheeky nod — smug survivors are good comic material too.
+
+Tone: British English, dry, affectionate piss-taking between mates who like each other. Keep it light — tease the pick, never anything genuinely personal. Mild swearing is allowed only if it genuinely sharpens a joke (mug, clown, muppet) — but a clean line that's actually funny is always better, and never be crude or nasty for its own sake. If nothing about a pick is funny, leave it out rather than forcing a weak dig.
+
+Important: this is a mixed group, not all men. NEVER address them as "lads", "boys", "fellas" or anything gendered. Address the group as "everyone", "the group", or just talk about the round directly. Refer to individuals by the names given.
+
+No emoji. Don't robotically list every player — find the two or three funniest angles in this round and land them.
 
 Round: ${roundLabel || "this round"}
 
@@ -34,7 +45,7 @@ ${pickLines}
 Survivors: ${(survivors || []).join(", ") || "none"}
 Knocked out: ${(ousted || []).join(", ") || "none"}
 
-Return ONLY the banter lines, nothing else.`;
+Return ONLY the summary lines, nothing else.`;
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
