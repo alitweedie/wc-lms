@@ -1071,13 +1071,38 @@ function CloseRoundPanel({ unpickedAlive, onClose }) {
   );
 }
 
-function RoundSummaryButton({ round, wcRound, gi, survivors, ousted, aliveAtStart, setRoundSummary, adminMode }) {
+function RoundSummaryButton({ round, wcRound, gi, survivors, ousted, aliveAtStart, matchResults, fixtureOverrides, setRoundSummary, adminMode }) {
   const [phase, setPhase] = useState("idle"); // idle | loading | copied
   const stored = round.summary; // shared, persisted summary (same for everyone)
 
   // Only available once every alive player's pick has an outcome.
   const fullySettled = isRoundFullySettled(round, aliveAtStart);
   if (!fullySettled) return null;
+
+  // Look up a team's actual match result in this round (score + how it was
+  // decided) so the summary can be specific: "Germany lost 4-5 on penalties".
+  function resultForTeam(team) {
+    if (!team) return null;
+    const fixtures = resolveFixtures(wcRound, fixtureOverrides[round.id]);
+    const fx = fixtures.find(([h,a]) => h===team || a===team);
+    if (!fx) return null;
+    const [h,a] = fx;
+    const rec = matchResults[`${round.id}|${h}|${a}`];
+    if (!rec || rec.h==null || rec.a==null) return null;
+    const isHome = h===team;
+    const opp = isHome ? a : h;
+    const forGoals = isHome ? rec.h : rec.a;
+    const agGoals  = isHome ? rec.a : rec.h;
+    let how = "";
+    if (rec.dur === "PENALTY_SHOOTOUT" && rec.ph!=null && rec.pa!=null) {
+      const pf = isHome ? rec.ph : rec.pa, pa = isHome ? rec.pa : rec.ph;
+      how = ` (${pf}-${pa} on penalties)`;
+    } else if (rec.dur === "EXTRA_TIME") {
+      how = " (after extra time)";
+    }
+    const verb = forGoals>agGoals ? "beat" : forGoals<agGoals ? "lost to" : "drew with";
+    return `${team} ${verb} ${opp} ${forGoals}-${agGoals}${how}`;
+  }
 
   async function generate() {
     setPhase("loading");
@@ -1093,7 +1118,11 @@ function RoundSummaryButton({ round, wcRound, gi, survivors, ousted, aliveAtStar
       const pk = round.picks[p];
       const o = round.outcomes[p];
       if (!pk) return `${p}: no pick`;
-      return `${p} picked ${pk} (${o||"pending"})`;
+      const res = resultForTeam(pk);
+      const status = o==="win" ? "through" : o==="lose" ? "OUT" : o||"pending";
+      return res
+        ? `${p} picked ${pk} — ${res} — ${status}`
+        : `${p} picked ${pk} (${status})`;
     }).join("\n");
 
     let banter = "";
@@ -1134,7 +1163,7 @@ Write 2-4 short lines. Vary the rhythm — a pun, an observation, a dry one-line
 
 Tone: British English, dry, affectionate piss-taking between mates who like each other. Tease the pick, never anything genuinely personal. Mild swearing only if it genuinely sharpens a joke (mug, clown, muppet); a clean funny line is always better. If a pick isn't funny, leave it out rather than forcing a weak dig.
 
-CRITICAL — only use the facts given below. Do NOT invent scorelines, goal times, or details you haven't been told. Do NOT reference how many rounds are left, what happens "next round", future fixtures, or how far anyone has to go — you don't know the tournament structure, so guessing (e.g. "smug for the next six rounds") will be wrong and kill the joke. Talk only about THIS round: the picks, who's in, who's out.
+CRITICAL — only use the facts given below. Each pick line now includes the actual result (score, and whether it went to extra time or penalties) — USE these real details for specific jokes ("out on penalties", "battered 4-0", "scraped it in extra time"). Do NOT invent scorelines or details beyond what's listed. Do NOT say whether a result was expected, an upset, or against the odds — you are not told the odds, so don't guess which team was favourite. Do NOT reference how many rounds are left, what happens "next round", or future fixtures — you don't know the tournament structure, so guessing (e.g. "smug for the next six rounds") will be wrong. Talk only about THIS round: the picks, the results given, who's in, who's out.
 
 Important: this is a mixed group, not all men. NEVER address them as "lads", "boys", "fellas" or anything gendered. Address the group as "everyone" or "the group", or just talk about the round. Refer to individuals by the names given.
 
@@ -1395,6 +1424,8 @@ function RoundCard({ round, wcRound, game, gi, state, aliveAtStart, elimMap, ent
               round={round} wcRound={wcRound} gi={gi}
               survivors={survivors} ousted={ousted}
               aliveAtStart={aliveAtStart}
+              matchResults={state.matchResults||{}}
+              fixtureOverrides={state.fixtureOverrides||{}}
               setRoundSummary={setRoundSummary}
               adminMode={adminMode}
             />
