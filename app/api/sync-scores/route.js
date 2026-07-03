@@ -365,7 +365,12 @@ export async function GET(request) {
       if (!m.homeLabel || !m.awayLabel || m.roundId == null) continue;
       if (m.homeGoals === null) continue;
       const key = `${m.roundId}|${m.homeLabel}|${m.awayLabel}`;
-      state.matchResults[key] = { h: m.homeGoals, a: m.awayGoals };
+      const rec = { h: m.homeGoals, a: m.awayGoals };
+      // Capture how a knockout was decided so summaries can be specific
+      // (e.g. "went out on penalties", "won it in extra time").
+      if (m.duration && m.duration !== "REGULAR") rec.dur = m.duration; // EXTRA_TIME | PENALTY_SHOOTOUT
+      if (m.penHome != null && m.penAway != null) { rec.ph = m.penHome; rec.pa = m.penAway; }
+      state.matchResults[key] = rec;
     }
 
     let totalChanges = 0;
