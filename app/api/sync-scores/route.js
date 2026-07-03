@@ -357,7 +357,7 @@ export async function GET(request) {
     for (const m of raw) {
       if (m.stage === "GROUP_STAGE") continue;
       const sc = m.score || {};
-      log.push(`Non-group match: stage="${m.stage}" ${m.homeTeam?.name} v ${m.awayTeam?.name} -> roundId=${matchRoundId(m)} | winner=${sc.winner} dur=${sc.duration} ft=${sc.fullTime?.home}-${sc.fullTime?.away} pens=${sc.penalties?.home}-${sc.penalties?.away}`);
+      log.push(`Non-group match: stage="${m.stage}" ${m.homeTeam?.name} v ${m.awayTeam?.name} -> roundId=${matchRoundId(m)} | winner=${sc.winner} dur=${sc.duration} ft=${sc.fullTime?.home}-${sc.fullTime?.away} reg=${sc.regularTime?.home}-${sc.regularTime?.away} et=${sc.extraTime?.home}-${sc.extraTime?.away} pens=${sc.penalties?.home}-${sc.penalties?.away}`);
     }
 
     const resultLookup = buildResultLookup(finished);
@@ -369,17 +369,24 @@ export async function GET(request) {
       if (!m.homeLabel || !m.awayLabel || m.roundId == null) continue;
       if (m.homeGoals === null) continue;
       const key = `${m.roundId}|${m.homeLabel}|${m.awayLabel}`;
-      // The "score" we store is the actual in-play result, NOT football-data's
-      // fullTime figure — for a shoot-out that figure folds in the penalty tally
-      // (e.g. a 1-1 that went 3-4 on pens is reported as 4-5), which wrongly reads
-      // as "conceded 5 goals". Prefer extraTime, then regularTime, then fullTime.
+      // Store the actual IN-PLAY score, not football-data's fullTime figure.
+      // For a shoot-out, fullTime = in-play score + penalty tally (confirmed from
+      // real data: Germany ft 4-5 / pens 3-4 was a 1-1 that went 3-4 on pens).
+      // So in-play = fullTime − penalties. Prefer explicit extraTime/regularTime
+      // when present; otherwise fall back to the subtraction; otherwise fullTime.
       let sh = m.homeGoals, sa = m.awayGoals;
       if (m.etHome != null && m.etAway != null) { sh = m.etHome; sa = m.etAway; }
       else if (m.regHome != null && m.regAway != null) { sh = m.regHome; sa = m.regAway; }
+      else if (m.duration === "PENALTY_SHOOTOUT" && m.penHome != null && m.penAway != null) {
+        sh = m.homeGoals - m.penHome; sa = m.awayGoals - m.penAway;
+      }
       const rec = { h: sh, a: sa };
       if (m.duration && m.duration !== "REGULAR") rec.dur = m.duration; // EXTRA_TIME | PENALTY_SHOOTOUT
       if (m.penHome != null && m.penAway != null) { rec.ph = m.penHome; rec.pa = m.penAway; }
       state.matchResults[key] = rec;
+      if (DIAG && m.roundId >= 4) {
+        log.push(`STORE ${key} = ${JSON.stringify(rec)} (ft was ${m.homeGoals}-${m.awayGoals})`);
+      }
     }
 
     let totalChanges = 0;
