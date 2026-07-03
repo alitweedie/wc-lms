@@ -260,6 +260,10 @@ async function fetchFinishedMatches(apiKey) {
     duration:  m.score?.duration,
     homeGoals: m.score?.fullTime?.home ?? null,
     awayGoals: m.score?.fullTime?.away ?? null,
+    regHome:   m.score?.regularTime?.home ?? null,
+    regAway:   m.score?.regularTime?.away ?? null,
+    etHome:    m.score?.extraTime?.home ?? null,
+    etAway:    m.score?.extraTime?.away ?? null,
     penHome:   m.score?.penalties?.home ?? null,
     penAway:   m.score?.penalties?.away ?? null,
     roundId:   matchRoundId(m),
@@ -365,9 +369,14 @@ export async function GET(request) {
       if (!m.homeLabel || !m.awayLabel || m.roundId == null) continue;
       if (m.homeGoals === null) continue;
       const key = `${m.roundId}|${m.homeLabel}|${m.awayLabel}`;
-      const rec = { h: m.homeGoals, a: m.awayGoals };
-      // Capture how a knockout was decided so summaries can be specific
-      // (e.g. "went out on penalties", "won it in extra time").
+      // The "score" we store is the actual in-play result, NOT football-data's
+      // fullTime figure — for a shoot-out that figure folds in the penalty tally
+      // (e.g. a 1-1 that went 3-4 on pens is reported as 4-5), which wrongly reads
+      // as "conceded 5 goals". Prefer extraTime, then regularTime, then fullTime.
+      let sh = m.homeGoals, sa = m.awayGoals;
+      if (m.etHome != null && m.etAway != null) { sh = m.etHome; sa = m.etAway; }
+      else if (m.regHome != null && m.regAway != null) { sh = m.regHome; sa = m.regAway; }
+      const rec = { h: sh, a: sa };
       if (m.duration && m.duration !== "REGULAR") rec.dur = m.duration; // EXTRA_TIME | PENALTY_SHOOTOUT
       if (m.penHome != null && m.penAway != null) { rec.ph = m.penHome; rec.pa = m.penAway; }
       state.matchResults[key] = rec;
