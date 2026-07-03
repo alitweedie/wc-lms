@@ -369,16 +369,19 @@ export async function GET(request) {
       if (!m.homeLabel || !m.awayLabel || m.roundId == null) continue;
       if (m.homeGoals === null) continue;
       const key = `${m.roundId}|${m.homeLabel}|${m.awayLabel}`;
-      // Store the actual IN-PLAY score, not football-data's fullTime figure.
-      // For a shoot-out, fullTime = in-play score + penalty tally (confirmed from
-      // real data: Germany ft 4-5 / pens 3-4 was a 1-1 that went 3-4 on pens).
-      // So in-play = fullTime − penalties. Prefer explicit extraTime/regularTime
-      // when present; otherwise fall back to the subtraction; otherwise fullTime.
+      // Store the actual IN-PLAY score (after 90/120 mins), NOT football-data's
+      // fullTime figure. For a shoot-out, fullTime folds in the penalty tally
+      // (Germany's real 1-1 that went 3-4 on pens is reported as ft 4-5), and the
+      // API's extraTime field holds only goals scored DURING ET, not the running
+      // total. The reliable in-play score:
+      //   • shoot-out  → fullTime − penalties        (4-5 − 3-4 = 1-1)  ✓
+      //   • extra time → regularTime + extraTime      (2-2 + 1-0 = 3-2)  ✓
+      //   • regular    → fullTime                     (unchanged)
       let sh = m.homeGoals, sa = m.awayGoals;
-      if (m.etHome != null && m.etAway != null) { sh = m.etHome; sa = m.etAway; }
-      else if (m.regHome != null && m.regAway != null) { sh = m.regHome; sa = m.regAway; }
-      else if (m.duration === "PENALTY_SHOOTOUT" && m.penHome != null && m.penAway != null) {
+      if (m.duration === "PENALTY_SHOOTOUT" && m.penHome != null && m.penAway != null) {
         sh = m.homeGoals - m.penHome; sa = m.awayGoals - m.penAway;
+      } else if (m.duration === "EXTRA_TIME" && m.regHome != null && m.etHome != null) {
+        sh = m.regHome + m.etHome; sa = m.regAway + m.etAway;
       }
       const rec = { h: sh, a: sa };
       if (m.duration && m.duration !== "REGULAR") rec.dur = m.duration; // EXTRA_TIME | PENALTY_SHOOTOUT
