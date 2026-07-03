@@ -1118,16 +1118,25 @@ function RoundSummaryButton({ round, wcRound, gi, survivors, ousted, aliveAtStar
             messages: [{ role: "user", content:
 `You write the round summary for a 9-person World Cup Last Man Standing WhatsApp group. Everyone knows their football. The goal is to make the group actually laugh — warm, sharp, quotable banter, the kind of message people screenshot and reply to. Think group-chat comedy, not insult comedy.
 
-Write 2-4 short lines. Vary them. What actually makes it funny:
-- SPECIFICITY beats generic mockery. Don't say "terrible pick" — name the team, the score, what actually happened, and find the absurd angle in it. "Backed a team that shipped four" lands; "you're clueless" doesn't.
-- Play the RESULT for laughs, not the person's intelligence. The joke is the football — the last-minute winner, the team that bottled it, the 'safe' pick that wasn't. React to the drama.
-- UNDERSTATEMENT and a good comparison beat piling on. One well-aimed dry line is funnier than three angry ones.
-- A CALLBACK or running theme across the lines ties it together and reads as clever.
-- Give whoever's still standing a genuine but cheeky nod — smug survivors are good comic material too.
+Channel the sensibility of British comedians — mix their styles so it never gets one-note:
+- Tim Vine / Milton Jones: quick puns and daft wordplay, especially on team names, scorelines and player names. One good groaner per summary, not five.
+- Peter Kay / Kevin Bridges: warm, observational, "we've all been there" storytelling — the mate who talks himself into a bad decision.
+- Jimmy Carr: one precision-engineered savage one-liner with a clean twist ending (use sparingly — the sting is in the surprise, not the cruelty).
+- Stewart Lee: mock-overblown repetition and mock-epic framing of something trivial.
+Blend, don't imitate — the result should feel like a witty mate, not a stand-up routine.
 
-Tone: British English, dry, affectionate piss-taking between mates who like each other. Keep it light — tease the pick, never anything genuinely personal. Mild swearing is allowed only if it genuinely sharpens a joke (mug, clown, muppet) — but a clean line that's actually funny is always better, and never be crude or nasty for its own sake. If nothing about a pick is funny, leave it out rather than forcing a weak dig.
+Write 2-4 short lines. Vary the rhythm — a pun, an observation, a dry one-liner. What actually makes it funny:
+- SPECIFICITY beats generic mockery. Name the team, the score, what actually happened, find the absurd angle. "Backed a team that shipped four" lands; "you're clueless" doesn't.
+- Play the RESULT for laughs, not the person's intelligence. The joke is the football — the last-minute winner, the team that bottled it, the 'safe' pick that wasn't.
+- UNDERSTATEMENT and a good comparison beat piling on. One well-aimed dry line beats three angry ones.
+- A CALLBACK or running theme across the lines ties it together and reads clever.
+- Give whoever's still standing a cheeky nod — smug survivors are good material.
 
-Important: this is a mixed group, not all men. NEVER address them as "lads", "boys", "fellas" or anything gendered. Address the group as "everyone", "the group", or just talk about the round directly. Refer to individuals by the names given.
+Tone: British English, dry, affectionate piss-taking between mates who like each other. Tease the pick, never anything genuinely personal. Mild swearing only if it genuinely sharpens a joke (mug, clown, muppet); a clean funny line is always better. If a pick isn't funny, leave it out rather than forcing a weak dig.
+
+CRITICAL — only use the facts given below. Do NOT invent scorelines, goal times, or details you haven't been told. Do NOT reference how many rounds are left, what happens "next round", future fixtures, or how far anyone has to go — you don't know the tournament structure, so guessing (e.g. "smug for the next six rounds") will be wrong and kill the joke. Talk only about THIS round: the picks, who's in, who's out.
+
+Important: this is a mixed group, not all men. NEVER address them as "lads", "boys", "fellas" or anything gendered. Address the group as "everyone" or "the group", or just talk about the round. Refer to individuals by the names given.
 
 No emoji. Don't robotically list every player — find the two or three funniest angles in this round and land them.
 
