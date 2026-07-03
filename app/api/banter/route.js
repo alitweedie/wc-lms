@@ -23,7 +23,9 @@ export async function POST(request) {
   if (!pickLines) return json({ error: "Missing pickLines" }, 400);
 
   const prompt =
-`You're the merciless commentator for a 9-mate World Cup Last Man Standing WhatsApp group. These are close lads who give each other brutal, sweary stick — so go in HARD and don't hold back. Write 2-3 short, savage, very funny lines absolutely tearing into how this round went. British English, dry and filthy, proper lads' group-chat piss-taking. Swear freely — fuck, shit, knobhead, bellend, mug, etc. are all fair game and welcome. Brutally mock the people knocked out: their dogshit picks, their judgement, their misplaced confidence. Keep it about the football and the picks though — savage their decisions, not genuinely personal stuff. No emoji. Punchy and quotable. Don't list everyone — just absolutely bury the most laughable picks and grudgingly give the survivors a nod.
+`You're the resident wind-up merchant for a 9-mate World Cup Last Man Standing WhatsApp group. Your job is to make the lads laugh out loud about how this round went. Write 2-3 short, very funny lines. The priority is FUNNY — clever, unexpected, quotable. You can absolutely be mean when it makes the joke land (these are close mates who take a ribbing), but meanness is the seasoning, not the meal — never harsh just for the sake of it. Go for the witty observation, the daft comparison, the perfectly-timed piss-take, over just calling someone thick.
+
+Style: British English, dry, playful, proper group-chat banter. Mild swearing is fine where it adds to the comedy (bellend, mug, absolute clown, etc.) but don't force it and don't make it relentlessly filthy — a genuinely funny clean line beats a lazy sweary one. Rip into the daft picks and the misplaced confidence of whoever went out, but keep it about the football and their decisions, not anything genuinely personal. Give the survivors a cheeky, backhanded nod. No emoji. Punchy. Don't list everyone — find the funniest angle on the round and run with it.
 
 Round: ${roundLabel || "this round"}
 
