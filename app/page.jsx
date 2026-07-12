@@ -312,7 +312,7 @@ function buildGame(id, startRoundIdx=0, opts={}) {
   return {
     id, label: opts.label || `Game ${id}`, startRoundIdx,
     rounds: ROUNDS.slice(startRoundIdx).map(r=>({ id:r.id, label:r.label, stage:r.stage, picks:{}, outcomes:{}, tiebreaker:{} })),
-    complete:false, winners:[], rollover:0,
+    complete:false, winners:[], rollover:0, rolloverOut:0,
     // parallel games run alongside the main sequence rather than after it.
     // restrictedTo, when set, limits entrants to a fixed list of players
     // (used for "second chance" games for people already eliminated elsewhere).
@@ -325,6 +325,9 @@ function defaultState() {
   return {
     players:["Ben","Tom","James","Tweedie","Kieran","Tucker","Ash","Toynbee"],
     games:[buildGame(1,0)],
+    // Pot from a game that ended with no winner and had no running game to
+    // roll into. The next game created absorbs it.
+    pendingRollover: 0,
     predictor: {
       picks: {},
       answers: {},
@@ -406,7 +409,9 @@ function isRoundFullySettled(round, aliveAtStart) {
   });
 }
 
-function evaluateGameEnd(g, players, allGames, thisGi) {
+// `pending` is a mutable holder ({amount}) for a rollover that has nowhere to go
+// yet (no other game running). The next game created absorbs it.
+function evaluateGameEnd(g, players, allGames, thisGi, pending) {
   let lastSettledIdx = -1;
   for (let i = 0; i < g.rounds.length; i++) {
     const alive = getAliveAtStart(g, players, i);
@@ -442,7 +447,31 @@ function evaluateGameEnd(g, players, allGames, thisGi) {
 
   g.complete = true;
   g.winners = survivors.length === 1 ? survivors : (isFinalRound && survivors.length > 0 ? survivors : []);
-  if (survivors.length === 0) g.rolledOver = true;
+
+  // ── Rollover ────────────────────────────────────────────────────────────────
+  // If nobody won this game, its pot must not be lost. It rolls into the NEXT
+  // incomplete game already running (any game, sequential or concurrent). If no
+  // other game is running, it's parked as a pending rollover that the next game
+  // to be created will absorb. This is independent of whether a follow-on game
+  // spawns below.
+  const deadPot = calcPot(g, players);
+  if (survivors.length === 0 && deadPot > 0) {
+    g.rolledOver = true;
+    g.rolloverOut = deadPot; // for display: this game sent its pot onward
+    let landed = false;
+    if (allGames && Array.isArray(allGames)) {
+      // Next incomplete game, in game order, that isn't this one.
+      const target = allGames.find((og, i) => i !== thisGi && !og.complete);
+      if (target) {
+        target.rollover = (target.rollover || 0) + deadPot;
+        landed = true;
+      }
+    }
+    if (!landed && pending) {
+      // No running game to take it — hold it for the next game created.
+      pending.amount = (pending.amount || 0) + deadPot;
+    }
+  }
 
   // The Final is the last round of the tournament — there is no next round,
   // so no new game should ever spawn after it.
@@ -451,18 +480,37 @@ function evaluateGameEnd(g, players, allGames, thisGi) {
 
   // Parallel ("second chance") games never auto-spawn a sequential follow-on —
   // only the main sequence does that. And even then, only once EVERY other
-  // currently-running game (main or parallel) has also finished, so a second
-  // chance game in progress holds back the next main game until it's done.
+  // currently-running game (main or parallel) has also finished.
   if (g.parallel) return;
   if (allGames && Array.isArray(allGames)) {
     const othersStillRunning = allGames.some((og, i) => i !== thisGi && !og.complete);
     if (othersStillRunning) return;
   }
 
-  const pot = calcPot(g, players);
+  // Spawn the next sequential game. If a rollover was parked (nothing was
+  // running to take it), it lands here.
   const newGame = buildGame(0, wcIdx + 1);
-  newGame.rollover = alive.length === 0 ? pot : 0;
+  if (pending && pending.amount > 0) {
+    newGame.rollover = pending.amount;
+    pending.amount = 0;
+  }
   return newGame;
+}
+
+// Predictor answers may list SEVERAL correct values, comma-separated — e.g. if
+// three nations tie for "most goals conceded", any of them scores. A single
+// answer with no comma behaves exactly as before.
+function answerMatches(answer, pick) {
+  if (!answer || !pick) return false;
+  const normalise = v => {
+    const s = String(v).trim();
+    // Scoreline answers like "4-3" are order-insensitive.
+    return /^\d+\s*-\s*\d+$/.test(s)
+      ? s.split("-").map(n=>Number(n.trim())).sort((a,b)=>a-b).join("-")
+      : s.toLowerCase();
+  };
+  const correct = String(answer).split(",").map(a=>normalise(a)).filter(Boolean);
+  return correct.includes(normalise(pick));
 }
 
 function usedTeams(game, player, roundIndex) {
@@ -508,7 +556,7 @@ function computeMoneyTracker(state) {
   for (const p of state.players) {
     scores[p] = 0;
     const picks = pred.picks[p] || {};
-    const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).map(s=>s.toLowerCase().trim());
+    const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).flatMap(s=>String(s).split(",")).map(s=>s.toLowerCase().trim()).filter(Boolean);
     for (const q of PREDICTOR_QUESTIONS) {
       if (q.id === "semi1" || q.id === "semi2" || q.id === "semi3" || q.id === "semi4") {
         const pick = (picks[q.id]||"").toLowerCase().trim();
@@ -521,10 +569,7 @@ function computeMoneyTracker(state) {
         if (overrideVal === false) continue;
       }
       const ans = pred.answers[q.id];
-      if (ans && picks[q.id]) {
-        const normalise = v => v.includes("-") ? v.split("-").map(Number).sort((a,b)=>a-b).join("-") : v.toLowerCase().trim();
-        if (normalise(ans) === normalise(picks[q.id])) scores[p] += q.pts;
-      }
+      if (ans && picks[q.id] && answerMatches(ans, picks[q.id])) scores[p] += q.pts;
     }
   }
   const maxScore = Math.max(...Object.values(scores), 0);
@@ -644,6 +689,11 @@ export default function App() {
       parallel: true,
       label: `Game ${newId}`,
     });
+    // A pot from a game that ended with no winner and had nowhere to go lands here.
+    if (s.pendingRollover > 0) {
+      newGame.rollover = s.pendingRollover;
+      s.pendingRollover = 0;
+    }
     s.games.push(newGame);
   });
 
@@ -659,7 +709,8 @@ export default function App() {
         r.outcomes[p] = OUTCOME.LOSE;
       }
     }
-    const newGame = evaluateGameEnd(g, s.players, s.games, gi);
+    const pending = { amount: s.pendingRollover || 0 };
+    const newGame = evaluateGameEnd(g, s.players, s.games, gi, pending);
     if (newGame) {
       const alreadyExists = s.games.length > gi + 1;
       if (!alreadyExists) {
@@ -668,6 +719,7 @@ export default function App() {
         s.games.push(newGame);
       }
     }
+    s.pendingRollover = pending.amount;
   });
 
   const reopenRound = (gi, roundId) => update(s => {
@@ -698,6 +750,14 @@ export default function App() {
     r.outcomes[player] = (r.outcomes[player] === outcome) ? OUTCOME.PENDING : outcome;
 
     if (g.complete) {
+      // Un-completing a game: claw back any rollover it had pushed onward,
+      // otherwise the money would be double-counted when it re-completes.
+      if (g.rolloverOut > 0) {
+        const target = s.games.find((og, i) => i !== gi && og.rollover > 0 && !og.complete);
+        if (target) target.rollover = Math.max(0, (target.rollover || 0) - g.rolloverOut);
+        else s.pendingRollover = Math.max(0, (s.pendingRollover || 0) - g.rolloverOut);
+        g.rolloverOut = 0;
+      }
       g.complete = false;
       g.winners = [];
       g.rolledOver = false;
@@ -708,7 +768,8 @@ export default function App() {
       }
     }
 
-    const newGame = evaluateGameEnd(g, s.players, s.games, gi);
+    const pending = { amount: s.pendingRollover || 0 };
+    const newGame = evaluateGameEnd(g, s.players, s.games, gi, pending);
     if (newGame) {
       const alreadyExists = s.games.length > gi + 1;
       if (!alreadyExists) {
@@ -717,6 +778,7 @@ export default function App() {
         s.games.push(newGame);
       }
     }
+    s.pendingRollover = pending.amount;
   });
 
   const setPredictorPick = (player, questionId, answer) => update(s => {
@@ -860,9 +922,15 @@ export default function App() {
             </div>
           </div>
         )}
-        {tab==="tracker"&&game.rolledOver&&(
-          <div style={S.rolloverBanner}>Everyone out — £{pot} rolls over to {state.games[gi+1]?.label||"the next game"}</div>
-        )}
+        {tab==="tracker"&&game.rolledOver&&(()=>{
+          const amt = game.rolloverOut || pot;
+          const target = state.games.find((og,i)=>i!==gi && !og.complete);
+          return (
+            <div style={S.rolloverBanner}>
+              Everyone out — £{amt} rolls over to {target ? target.label : "the next game started"}
+            </div>
+          );
+        })()}
         {tab==="tracker"&&game.rollover>0&&!game.rolledOver&&(
           <div style={S.rolloverBanner}>Rollover included — £{game.rollover} carried into this game's pot</div>
         )}
@@ -1673,7 +1741,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
     "Tiebreaker":"Tiebreaker"
   };
 
-  const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).map(s=>s.toLowerCase().trim());
+  const sfAnswers = [pred.answers["semi1"], pred.answers["semi2"], pred.answers["semi3"], pred.answers["semi4"]].filter(Boolean).flatMap(s=>String(s).split(",")).map(s=>s.toLowerCase().trim()).filter(Boolean);
   const scores = {};
   for (const p of state.players) {
     scores[p] = 0;
@@ -1690,10 +1758,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
         if (overrideVal === false) continue;
       }
       const ans = pred.answers[q.id];
-      if (ans && picks[q.id]) {
-        const normalise = v => v.includes("-") ? v.split("-").map(Number).sort((a,b)=>a-b).join("-") : v.toLowerCase().trim();
-        if (normalise(ans) === normalise(picks[q.id])) scores[p] += q.pts;
-      }
+      if (ans && picks[q.id] && answerMatches(ans, picks[q.id])) scores[p] += q.pts;
     }
   }
   const maxPts = PREDICTOR_QUESTIONS.reduce((s,q)=>s+q.pts,0);
@@ -1902,7 +1967,7 @@ function PredictorTab({ state, setPredictorPick, setPredictorAnswer, setPredicto
                           })}
                         </div>
                       )}
-                      <PredictorInput q={q} value={correctAnswer}
+                      <AnswerInput q={q} value={correctAnswer}
                         onChange={v=>setPredictorAnswer(q.id, v)}
                         placeholder="Set correct answer…"/>
                     </div>
@@ -2002,6 +2067,48 @@ function TiebreakerInput({ value, takenValues, onCommit }) {
         }}
       />
       {isTaken&&<div style={{fontSize:10,color:"#E61D25",fontWeight:700,marginTop:4,letterSpacing:1}}>⚠ TAKEN — PICK A DIFFERENT NUMBER</div>}
+    </div>
+  );
+}
+
+// Admin-only input for setting the CORRECT answer. For nation questions it
+// allows SEVERAL answers (stored comma-separated) so a tie — e.g. three nations
+// level on most goals conceded — credits everyone who picked any of them.
+// Non-nation questions fall through to the normal single-value input.
+function AnswerInput({ q, value, onChange, placeholder }) {
+  if (q.type !== "nation") {
+    return <PredictorInput q={q} value={value} onChange={onChange} placeholder={placeholder} />;
+  }
+  const selected = String(value||"").split(",").map(s=>s.trim()).filter(Boolean);
+  const add = (t) => {
+    if (!t || selected.includes(t)) return;
+    onChange([...selected, t].join(", "));
+  };
+  const remove = (t) => onChange(selected.filter(x=>x!==t).join(", "));
+  const remaining = (q.teams||ALL_NATIONS).filter(t=>!selected.includes(t));
+  return (
+    <div>
+      {selected.length>0&&(
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+          {selected.map(t=>(
+            <span key={t} style={{fontSize:11,color:"#a8e031",background:"#1a1b22",border:"1px solid #2a2c36",borderRadius:4,padding:"3px 8px",display:"flex",alignItems:"center",gap:6}}>
+              {FLAG[t]||"🏳️"} {t}
+              <button onClick={()=>remove(t)}
+                style={{background:"none",border:"none",color:"#E61D25",cursor:"pointer",fontSize:13,lineHeight:1,padding:0,fontWeight:700}}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <select style={{...S.pickSelect,fontSize:11,marginBottom:0}}
+        value="" onChange={e=>add(e.target.value)}>
+        <option value="">{selected.length ? "+ add another correct nation…" : (placeholder||"— set correct nation —")}</option>
+        {remaining.map(t=><option key={t} value={t}>{FLAG[t]||"🏳️"} {t}</option>)}
+      </select>
+      {selected.length>1&&(
+        <div style={{fontSize:9,color:"#6b7280",marginTop:4,letterSpacing:0.5,fontFamily:"'DM Sans',sans-serif"}}>
+          {selected.length} correct answers — anyone who picked any of these scores {q.pts} pts.
+        </div>
+      )}
     </div>
   );
 }
